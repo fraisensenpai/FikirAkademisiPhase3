@@ -34,7 +34,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           {userRole === 'student' ? (
             <img
               src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80"
-              alt="Defne Yılmaz"
+              alt="Öğrenci Profil"
               className="w-full h-full object-cover"
             />
           ) : (
@@ -45,10 +45,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
 
         <h2 className="font-['Plus_Jakarta_Sans'] text-xl font-bold text-[#091426]">
-          {userRole === 'student' ? 'Defne Yılmaz' : 'Ahmet Soylu'}
+          {userRole === 'student' ? 'Öğrenci' : 'Öğretmen'}
         </h2>
         <p className="text-xs font-semibold text-slate-500 mt-0.5">
-          {userRole === 'student' ? '10-A Sınıfı • Okul No: 1084' : 'Türk Dili ve Edebiyatı Danışmanı'}
+          {userRole === 'student' ? 'Sınıfınız' : 'Akademik Danışman'}
         </p>
 
         {/* Quick Role Toggle */}

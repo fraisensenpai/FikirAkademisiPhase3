@@ -15,7 +15,7 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSelectBook, books }) =
     {
       id: 'p1',
       author: 'Ayşe Yılmaz',
-      authorAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+      authorAvatar: 'https://ui-avatars.com/api/?name=Ayşe+Yılmaz&background=random',
       time: '25 dk önce',
       bookTitle: '1984',
       bookId: '1984',
@@ -27,7 +27,7 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSelectBook, books }) =
     {
       id: 'p2',
       author: 'Zeynep Demir',
-      authorAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80',
+      authorAvatar: 'https://ui-avatars.com/api/?name=Zeynep+Demir&background=random',
       time: '2 saat önce',
       bookTitle: 'The Architecture of Happiness',
       bookId: 'arch-happiness',
@@ -59,8 +59,8 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSelectBook, books }) =
 
     const newPost = {
       id: 'p-' + Date.now(),
-      author: 'Defne Yılmaz (Ben)',
-      authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      author: 'Kullanıcı',
+      authorAvatar: 'https://ui-avatars.com/api/?name=Kullanıcı&background=091426&color=fff',
       time: 'Az önce',
       bookTitle: 'İnsan Neyle Yaşar?',
       bookId: 'insan-neyle-yasar',

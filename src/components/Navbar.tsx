@@ -70,10 +70,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
             <div className="text-left hidden sm:block">
               <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                {userRole === 'student' ? '10-A Sınıfı • Öğrenci' : 'Akademik Danışman'}
+                {userRole === 'student' ? 'Sınıfınız • Öğrenci' : 'Akademik Danışman'}
               </span>
               <span className="block text-sm font-bold text-[#091426] leading-tight">
-                {userRole === 'student' ? 'Defne Yılmaz' : 'Ahmet Soylu'}
+                {userRole === 'student' ? 'Öğrenci' : 'Öğretmen'}
               </span>
             </div>
           </button>
