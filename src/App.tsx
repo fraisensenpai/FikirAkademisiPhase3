@@ -23,6 +23,7 @@ export default function App() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
 
   useEffect(() => {
+    console.log('App mounting, user:', user, 'loading:', loading);
     if (user) {
       loadData();
     }
