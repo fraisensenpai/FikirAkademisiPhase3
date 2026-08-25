@@ -10,8 +10,10 @@ import { TeacherDashboard } from './components/TeacherDashboard';
 import { SocialView } from './components/SocialView';
 import { ProfileView } from './components/ProfileView';
 import { AuthScreens } from './components/AuthScreens';
+import { useAuth } from './contexts/AuthContext';
 
 export default function App() {
+  const { user, loading } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
   const [userRole, setUserRole] = useState<UserRole>('student');
   const [books, setBooks] = useState<Book[]>(initialBooks);
@@ -19,6 +21,16 @@ export default function App() {
   const [notes, setNotes] = useState<Note[]>(mockInitialNotes);
   const [students, setStudents] = useState(mockStudents);
   const [assignments, setAssignments] = useState(mockAssignments);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  // Handle Auth redirection if not logged in
+  if (!user && (currentScreen !== 'student-register' && currentScreen !== 'teacher-register')) {
+    // Force to login if not already on register
+    // This simple logic might need refinement based on how `currentScreen` is managed
+  }
 
   // Helper to open reader with chosen book
   const handleSelectBook = (book: Book) => {
@@ -56,6 +68,19 @@ export default function App() {
     setUserRole(role);
     setCurrentScreen(role === 'student' ? 'dashboard' : 'teacher');
   };
+
+  // Auth Guard
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#f7f9fb]">
+        <AuthScreens
+          currentScreen={currentScreen === 'student-register' || currentScreen === 'teacher-register' ? currentScreen : 'login'}
+          onNavigate={(screen) => setCurrentScreen(screen)}
+          onLoginSuccess={handleLoginSuccess}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f7f9fb] text-[#191c1e] flex flex-col antialiased selection:bg-[#6cf8bb] selection:text-[#002113]">
@@ -118,16 +143,6 @@ export default function App() {
             setUserRole={setUserRole}
             setCurrentScreen={setCurrentScreen}
             badges={mockBadges}
-          />
-        )}
-
-        {(currentScreen === 'login' ||
-          currentScreen === 'student-register' ||
-          currentScreen === 'teacher-register') && (
-          <AuthScreens
-            currentScreen={currentScreen}
-            onNavigate={(screen) => setCurrentScreen(screen)}
-            onLoginSuccess={handleLoginSuccess}
           />
         )}
       </div>
