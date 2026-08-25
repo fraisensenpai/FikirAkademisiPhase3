@@ -10,7 +10,7 @@ import { SocialView } from './components/SocialView';
 import { ProfileView } from './components/ProfileView';
 import { AuthScreens } from './components/AuthScreens';
 import { useAuth } from './contexts/AuthContext';
-import { fetchBooks, fetchNotes, fetchStudents, fetchAssignments } from './lib/dataService';
+import { fetchBooks, fetchNotes, fetchStudents, fetchAssignments, createNote, deleteNote, updateBookAssignmentStatus } from './lib/dataService';
 
 export default function App() {
   const { user, loading, userRole, setUserRole } = useAuth();
@@ -50,25 +50,12 @@ export default function App() {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  // Handle Auth redirection if not logged in
-  if (!user && (currentScreen !== 'student-register' && currentScreen !== 'teacher-register')) {
-    // Force to login if not already on register
-    // This simple logic might need refinement based on how `currentScreen` is managed
-  }
-
   // Helper to open reader with chosen book
   const handleSelectBook = (book: Book) => {
     setSelectedBook(book);
     setCurrentScreen('reader');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-import { createNote, deleteNote, updateBookAssignmentStatus } from './lib/dataService';
-import { useAuth } from './contexts/AuthContext';
-
-// ... (in App component)
-  const { user, loading, userRole, setUserRole } = useAuth();
-// ...
 
   const handleAddNote = async (newNoteData: Omit<Note, 'id' | 'createdAt'>) => {
     if (!user) return;
@@ -86,9 +73,6 @@ import { useAuth } from './contexts/AuthContext';
   };
 
   const handleAssignHomework = async (newAssignment: any) => {
-    // Note: createAssignment is already defined in dataService, 
-    // but needs implementation in component if not present.
-    // For now, updating local state as well
     setAssignments([newAssignment, ...assignments]);
     await updateBookAssignmentStatus(newAssignment.bookId, true, newAssignment.dueDate);
     
@@ -119,13 +103,17 @@ import { useAuth } from './contexts/AuthContext';
     );
   }
 
+  const activeRole = userRole || 'student';
+  const activeBook = selectedBook || (books.length > 0 ? books[0] : null);
+  const badges: any[] = []; // Replacing mockBadges
+
   return (
     <div className="min-h-screen bg-[#f7f9fb] text-[#191c1e] flex flex-col antialiased selection:bg-[#6cf8bb] selection:text-[#002113]">
       {/* Top Navbar (hidden in Reader mode) */}
       <Navbar
         currentScreen={currentScreen}
         setCurrentScreen={setCurrentScreen}
-        userRole={userRole}
+        userRole={activeRole}
         setUserRole={setUserRole}
       />
 
@@ -134,7 +122,7 @@ import { useAuth } from './contexts/AuthContext';
         {currentScreen === 'dashboard' && (
           <StudentDashboard
             books={books}
-            badges={mockBadges}
+            badges={badges}
             onSelectBook={handleSelectBook}
             onNavigateToLibrary={() => setCurrentScreen('library')}
           />
@@ -147,9 +135,9 @@ import { useAuth } from './contexts/AuthContext';
           />
         )}
 
-        {currentScreen === 'reader' && (
+        {currentScreen === 'reader' && activeBook && (
           <BookReader
-            book={selectedBook}
+            book={activeBook}
             onBack={() => setCurrentScreen('library')}
             notes={notes}
             onAddNote={handleAddNote}
@@ -186,10 +174,10 @@ import { useAuth } from './contexts/AuthContext';
 
         {currentScreen === 'profile' && (
           <ProfileView
-            userRole={userRole}
+            userRole={activeRole}
             setUserRole={setUserRole}
             setCurrentScreen={setCurrentScreen}
-            badges={mockBadges}
+            badges={badges}
           />
         )}
       </div>
@@ -198,7 +186,7 @@ import { useAuth } from './contexts/AuthContext';
       <BottomNav
         currentScreen={currentScreen}
         setCurrentScreen={setCurrentScreen}
-        userRole={userRole}
+        userRole={activeRole}
       />
     </div>
   );
