@@ -50,45 +50,36 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#e0e3e5] px-4 sm:px-6 py-3 transition-all">
       <div className="max-w-4xl mx-auto flex items-center justify-between">
-        {/* Left: User Avatar & Role Indicator */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowRoleMenu(!showRoleMenu)}
-            className="relative group focus:outline-none flex items-center gap-2 p-1 rounded-full hover:bg-slate-100 transition-colors"
-            title="Kullanıcı / Rol Değiştir"
-          >
-            {userRole === 'student' ? (
-              <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-                alt="Öğrenci Profil"
-                className="w-10 h-10 rounded-full object-cover border-2 border-emerald-500/80 shadow-xs"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-[#091426] text-white flex items-center justify-center font-bold text-sm shadow-xs">
-                <GraduationCap className="w-5 h-5 text-emerald-400" />
+            {/* Left: User Avatar & Role Indicator */}
+            <div className="flex items-center gap-3">
+              <div className="relative group focus:outline-none flex items-center gap-2 p-1 rounded-full hover:bg-slate-100 transition-colors">
+                {userRole === 'student' ? (
+                  <img
+                    src="https://ui-avatars.com/api/?name=Öğrenci&background=091426&color=fff"
+                    alt="Profil"
+                    className="w-10 h-10 rounded-full object-cover border-2 border-emerald-500/80 shadow-xs"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-[#091426] text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                    <GraduationCap className="w-5 h-5 text-emerald-400" />
+                  </div>
+                )}
+                <div className="text-left hidden sm:block">
+                  <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    {userRole === 'student' ? 'Sınıfınız • Öğrenci' : 'Akademik Danışman'}
+                  </span>
+                  <span className="block text-sm font-bold text-[#091426] leading-tight">
+                    {userRole === 'student' ? 'Öğrenci' : 'Öğretmen'}
+                  </span>
+                </div>
               </div>
-            )}
-            <div className="text-left hidden sm:block">
-              <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                {userRole === 'student' ? 'Sınıfınız • Öğrenci' : 'Akademik Danışman'}
-              </span>
-              <span className="block text-sm font-bold text-[#091426] leading-tight">
-                {userRole === 'student' ? 'Öğrenci' : 'Öğretmen'}
-              </span>
             </div>
-          </button>
-        </div>
 
         {/* Center: Brand Title */}
         <div className="text-center">
-          <button
-            onClick={() => setCurrentScreen(userRole === 'student' ? 'dashboard' : 'teacher')}
-            className="focus:outline-none group"
-          >
-            <h1 className="font-['Plus_Jakarta_Sans'] text-xl sm:text-2xl font-bold text-[#091426] tracking-tight group-hover:text-emerald-700 transition-colors flex items-center gap-1.5 justify-center">
-              <span>{userRole === 'student' ? 'Fikir Akademisi' : 'Öğretmen Paneli'}</span>
-            </h1>
-          </button>
+          <h1 className="font-['Plus_Jakarta_Sans'] text-xl sm:text-2xl font-bold text-[#091426] tracking-tight flex items-center gap-1.5 justify-center">
+            <span>{userRole === 'student' ? 'Fikir Akademisi' : 'Öğretmen Paneli'}</span>
+          </h1>
         </div>
 
         {/* Right: Actions & Role Switcher */}
