@@ -17,6 +17,24 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 }) => {
   const continueBook = books.find((b) => b.id === 'insan-neyle-yasar') || books[0];
   const currentlyReading = books.filter((b) => b.id === 'donusum' || b.id === 'sapiens' || b.id === '1984');
+  
+  if (!continueBook) {
+    return (
+      <div className="max-w-md mx-auto px-4 pt-10 text-center">
+        <div className="bg-white rounded-2xl p-8 border border-[#e6e8ea] shadow-xs">
+          <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+          <h2 className="text-lg font-bold text-[#091426] mb-2">Henüz kitap bulunamadı</h2>
+          <p className="text-slate-500 text-sm mb-6">Kütüphaneye giderek yeni kitaplar keşfedebilirsin.</p>
+          <button 
+            onClick={onNavigateToLibrary}
+            className="bg-emerald-600 text-white px-6 py-2 rounded-full font-bold text-sm hover:bg-emerald-700 transition-colors"
+          >
+            Kütüphaneye Git
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto px-4 pt-4 pb-28 space-y-6">
@@ -69,8 +87,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             <div className="w-20 h-28 shrink-0 rounded-xl overflow-hidden shadow-sm border border-slate-200 bg-slate-100 relative group cursor-pointer"
                  onClick={() => onSelectBook(continueBook)}>
               <img
-                src={continueBook.coverUrl}
-                alt={continueBook.title}
+                src={continueBook?.coverUrl || ''}
+                alt={continueBook?.title || 'Kitap'}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
               <div className="absolute inset-0 bg-black/10"></div>
@@ -177,8 +195,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <div className="h-44 bg-slate-50 relative p-3 flex items-center justify-center border-b border-slate-100">
                 <div className="w-24 h-36 rounded-md overflow-hidden shadow-md border border-slate-200 group-hover:scale-105 transition-transform duration-300">
                   <img
-                    src={book.coverUrl}
-                    alt={book.title}
+                    src={book?.coverUrl || ''}
+                    alt={book?.title || 'Kitap'}
                     className="w-full h-full object-cover"
                   />
                 </div>
