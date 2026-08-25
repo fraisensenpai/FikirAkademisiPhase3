@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { Screen, UserRole, Book, Note } from './types';
-import { initialBooks, mockBadges, mockInitialNotes, mockStudents, mockAssignments } from './data/mockData';
+import React, { useState, useEffect } from 'react';
+import { Screen, UserRole, Book, Note, StudentProgress, Assignment } from './types';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { StudentDashboard } from './components/StudentDashboard';
@@ -11,16 +10,41 @@ import { SocialView } from './components/SocialView';
 import { ProfileView } from './components/ProfileView';
 import { AuthScreens } from './components/AuthScreens';
 import { useAuth } from './contexts/AuthContext';
+import { fetchBooks, fetchNotes, fetchStudents, fetchAssignments } from './lib/dataService';
 
 export default function App() {
-  const { user, loading } = useAuth();
+  const { user, loading, userRole, setUserRole } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
-  const [userRole, setUserRole] = useState<UserRole>('student');
-  const [books, setBooks] = useState<Book[]>(initialBooks);
-  const [selectedBook, setSelectedBook] = useState<Book>(initialBooks[0]);
-  const [notes, setNotes] = useState<Note[]>(mockInitialNotes);
-  const [students, setStudents] = useState(mockStudents);
-  const [assignments, setAssignments] = useState(mockAssignments);
+  
+  const [books, setBooks] = useState<Book[]>([]);
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [students, setStudents] = useState<StudentProgress[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      loadData();
+    }
+  }, [user, userRole]);
+
+  const loadData = async () => {
+    const fetchedBooks = await fetchBooks();
+    setBooks(fetchedBooks);
+    if (fetchedBooks.length > 0 && !selectedBook) setSelectedBook(fetchedBooks[0]);
+    
+    if (user) {
+      const fetchedNotes = await fetchNotes(user.id);
+      setNotes(fetchedNotes);
+    }
+
+    if (userRole === 'teacher') {
+      const fetchedStudents = await fetchStudents();
+      setStudents(fetchedStudents);
+      const fetchedAssignments = await fetchAssignments();
+      setAssignments(fetchedAssignments);
+    }
+  };
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -39,22 +63,35 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleAddNote = (newNoteData: Omit<Note, 'id' | 'createdAt'>) => {
-    const newNote: Note = {
-      ...newNoteData,
-      id: 'n-' + Date.now(),
-      createdAt: 'Az önce',
-    };
-    setNotes([newNote, ...notes]);
+import { createNote, deleteNote, updateBookAssignmentStatus } from './lib/dataService';
+import { useAuth } from './contexts/AuthContext';
+
+// ... (in App component)
+  const { user, loading, userRole, setUserRole } = useAuth();
+// ...
+
+  const handleAddNote = async (newNoteData: Omit<Note, 'id' | 'createdAt'>) => {
+    if (!user) return;
+    const newNote = await createNote({ ...newNoteData, user_id: user.id });
+    if (newNote) {
+      setNotes([newNote, ...notes]);
+    }
   };
 
-  const handleDeleteNote = (id: string) => {
-    setNotes(notes.filter((n) => n.id !== id));
+  const handleDeleteNote = async (id: string) => {
+    const success = await deleteNote(id);
+    if (success) {
+      setNotes(notes.filter((n) => n.id !== id));
+    }
   };
 
-  const handleAssignHomework = (newAssignment: any) => {
+  const handleAssignHomework = async (newAssignment: any) => {
+    // Note: createAssignment is already defined in dataService, 
+    // but needs implementation in component if not present.
+    // For now, updating local state as well
     setAssignments([newAssignment, ...assignments]);
-    // Also mark the book as assigned
+    await updateBookAssignmentStatus(newAssignment.bookId, true, newAssignment.dueDate);
+    
     setBooks(
       books.map((b) =>
         b.id === newAssignment.bookId
@@ -120,7 +157,7 @@ export default function App() {
           />
         )}
 
-        {currentScreen === 'teacher' && (
+        {currentScreen === 'teacher' && userRole === 'teacher' ? (
           <TeacherDashboard
             students={students}
             assignments={assignments}
@@ -128,7 +165,17 @@ export default function App() {
             onAssignHomework={handleAssignHomework}
             onSelectBook={handleSelectBook}
           />
-        )}
+        ) : currentScreen === 'teacher' ? (
+          <div className="p-10 text-center">
+            <p>Bu sayfaya erişim yetkiniz yok.</p>
+            <button 
+              onClick={() => setCurrentScreen('dashboard')}
+              className="mt-4 text-emerald-600 font-bold underline"
+            >
+              Dashboard'a dön
+            </button>
+          </div>
+        ) : null}
 
         {currentScreen === 'social' && (
           <SocialView
