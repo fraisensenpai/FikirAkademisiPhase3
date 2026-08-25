@@ -2,16 +2,17 @@ import React, { useState } from 'react';
 import { Screen, UserRole } from '../types';
 import {
   ArrowLeft,
-  GraduationCap,
-  Eye,
-  EyeOff,
   Mail,
   Lock,
   User,
-  BadgeCheck,
   ArrowRight,
   School,
+  Eye,
+  EyeOff,
+  GraduationCap,
+  BadgeCheck,
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface AuthScreensProps {
   currentScreen: 'login' | 'student-register' | 'teacher-register';
@@ -24,9 +25,12 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
   onNavigate,
   onLoginSuccess,
 }) => {
+  const { signIn, signUp } = useAuth();
+  const [loading, setLoading] = useState(false);
+  
   // Login states
-  const [loginEmail, setLoginEmail] = useState('student@fikir.edu');
-  const [loginPassword, setLoginPassword] = useState('••••••••');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
 
   // Student register states
   const [studentName, setStudentName] = useState('');
@@ -43,23 +47,44 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
   const [teacherEmail, setTeacherEmail] = useState('');
   const [teacherPassword, setTeacherPassword] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginEmail.toLowerCase().includes('teacher') || loginEmail.toLowerCase().includes('ogretmen')) {
-      onLoginSuccess('teacher');
+    setLoading(true);
+    const { error } = await signIn(loginEmail, loginPassword);
+    if (error) {
+      alert(error.message);
     } else {
+      // Role logic will be handled by AuthContext onAuthStateChange or navigation
+      // For now, assume student for simplicity or fetch role from metadata
       onLoginSuccess('student');
     }
+    setLoading(false);
   };
 
-  const handleStudentRegister = (e: React.FormEvent) => {
+  const handleStudentRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLoginSuccess('student');
+    setLoading(true);
+    const { error } = await signUp(studentEmail, studentPassword, 'student', { name: studentName });
+    if (error) {
+      alert(error.message);
+    } else {
+      alert('Kayıt başarılı! Lütfen giriş yapın.');
+      onNavigate('login');
+    }
+    setLoading(false);
   };
 
-  const handleTeacherRegister = (e: React.FormEvent) => {
+  const handleTeacherRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLoginSuccess('teacher');
+    setLoading(true);
+    const { error } = await signUp(teacherEmail, teacherPassword, 'teacher', { name: teacherName });
+    if (error) {
+      alert(error.message);
+    } else {
+      alert('Kayıt başarılı! Lütfen giriş yapın.');
+      onNavigate('login');
+    }
+    setLoading(false);
   };
 
   // 1. TEACHER REGISTRATION SCREEN
