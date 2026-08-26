@@ -14,6 +14,8 @@ drop table if exists public.notes cascade;
 drop table if exists public.students cascade;
 drop table if exists public.books cascade;
 drop table if exists public.profiles cascade;
+drop table if exists public.question_answers cascade;
+drop table if exists public.book_questions cascade;
 
 -- Eski trigger ve fonksiyonu temizle (auth.users üzerinde kalıcıdır)
 drop trigger if exists on_auth_user_created on auth.users;
@@ -141,6 +143,37 @@ create table public.post_likes (
 );
 
 -- ============================================================
+-- 6. BOOK_QUESTIONS + ANSWERS (geliştiricinin eklediği soru noktaları)
+-- ============================================================
+create table public.book_questions (
+  id uuid primary key default gen_random_uuid(),
+  book_id text not null references public.books(id) on delete cascade,
+  -- Öğrenci bu sayfayı bitirince soru çıkar
+  page integer not null,
+  question text not null,
+  option_a text not null,
+  option_b text not null,
+  option_c text not null,
+  option_d text not null,
+  correct_option char(1) not null check (correct_option in ('A', 'B', 'C', 'D')),
+  created_at timestamptz not null default now()
+);
+
+create index book_questions_book_idx on public.book_questions(book_id);
+
+create table public.question_answers (
+  id uuid primary key default gen_random_uuid(),
+  question_id uuid not null references public.book_questions(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  selected_option char(1) not null,
+  is_correct boolean not null,
+  answered_at timestamptz not null default now(),
+  unique(question_id, user_id)
+);
+
+create index question_answers_user_idx on public.question_answers(user_id);
+
+-- ============================================================
 -- 7. ROW LEVEL SECURITY
 -- ============================================================
 alter table public.profiles enable row level security;
@@ -150,6 +183,8 @@ alter table public.reading_progress enable row level security;
 alter table public.assignments enable row level security;
 alter table public.posts enable row level security;
 alter table public.post_likes enable row level security;
+alter table public.book_questions enable row level security;
+alter table public.question_answers enable row level security;
 
 -- PROFILES: herkes görebilir (öğretmen listesi için), sadece kendini düzenleyebilir
 create policy "profiles_select" on public.profiles for select to authenticated using (true);
@@ -199,3 +234,19 @@ create policy "posts_delete_own" on public.posts for delete to authenticated usi
 create policy "likes_select" on public.post_likes for select to authenticated using (true);
 create policy "likes_insert_own" on public.post_likes for insert to authenticated with check (auth.uid() = user_id);
 create policy "likes_delete_own" on public.post_likes for delete to authenticated using (auth.uid() = user_id);
+
+-- BOOK_QUESTIONS: herkes görebilir, sadece geliştirici yönetir
+create policy "questions_select" on public.book_questions for select to authenticated using (true);
+create policy "questions_insert_developer" on public.book_questions for insert to authenticated with check (
+  exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'developer')
+);
+create policy "questions_delete_developer" on public.book_questions for delete to authenticated using (
+  exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'developer')
+);
+
+-- QUESTION_ANSWERS: öğrenci kendi cevabını görür/yazar, öğretmen hepsini görür
+create policy "answers_select" on public.question_answers for select to authenticated using (
+  auth.uid() = user_id
+  or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('teacher', 'developer'))
+);
+create policy "answers_insert_own" on public.question_answers for insert to authenticated with check (auth.uid() = user_id);

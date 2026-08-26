@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { Book, Note, StudentProgress, StudentBookProgress, Assignment, Post } from '../types';
+import type { Book, Note, StudentProgress, StudentBookProgress, Assignment, Post, BookQuestion, QuizOption } from '../types';
 import { splitTextIntoPages } from './textSplitter';
 
 // --- SATIR EŞLEME (snake_case -> camelCase) ---
@@ -298,16 +298,23 @@ interface ProfileRow {
 }
 
 export const fetchStudentsWithProgress = async (): Promise<StudentProgress[]> => {
-  const [{ data: profiles }, { data: progress }, { data: assignments }] = await Promise.all([
-    supabase.from('profiles').select('*').eq('role', 'student'),
-    supabase.from('reading_progress').select('*'),
-    supabase.from('assignments').select('book_id'),
-  ]);
+  const [{ data: profiles }, { data: progress }, { data: assignments }, { data: questionRows }, { data: answerRows }] =
+    await Promise.all([
+      supabase.from('profiles').select('*').eq('role', 'student'),
+      supabase.from('reading_progress').select('*'),
+      supabase.from('assignments').select('book_id'),
+      supabase.from('book_questions').select('id, book_id, page'),
+      supabase.from('question_answers').select('user_id, question_id, is_correct'),
+    ]);
 
   if (!profiles) return [];
 
   const progressRows = (progress as unknown as ProgressRow[]) || [];
   const assignedBookIds = new Set(((assignments as unknown as { book_id: string }[]) || []).map((a) => a.book_id));
+
+  // Soru istatistikleri: sorular ve cevaplar
+  const questions = ((questionRows as unknown as { id: string; book_id: string; page: number }[]) || []);
+  const answers = ((answerRows as unknown as { user_id: string; question_id: string; is_correct: boolean }[]) || []);
 
   // Kitap bilgileri (yüzde hesabı ve başlıklar için)
   const { data: bookRows } = await supabase.from('books').select('id, total_pages, title');
@@ -337,6 +344,17 @@ export const fetchStudentsWithProgress = async (): Promise<StudentProgress[]> =>
         const pct = Math.min(100, Math.round((r.last_page / total) * 100));
         if (pct > overallPercent) overallPercent = pct;
         if (pct >= 100 && assignedBookIds.has(r.book_id)) hasCompleted = true;
+
+        // Bu kitapta ulaşılan soru noktaları ve doğru cevaplar
+        const reachedQuestions = questions.filter(
+          (q) => q.book_id === r.book_id && q.page <= r.last_page
+        );
+        let qCorrect = 0;
+        for (const q of reachedQuestions) {
+          const ans = answers.find((a) => a.user_id === profile.id && a.question_id === q.id);
+          if (ans?.is_correct) qCorrect++;
+        }
+
         bookProgress.push({
           bookId: r.book_id,
           bookTitle: bookTitleMap.get(r.book_id) || r.book_id,
@@ -344,6 +362,8 @@ export const fetchStudentsWithProgress = async (): Promise<StudentProgress[]> =>
           totalPages: total,
           progressPercent: pct,
           secondsRead: r.seconds_read || 0,
+          questionCorrect: qCorrect,
+          questionTotal: reachedQuestions.length,
           updatedAt: timeAgo(r.updated_at),
         });
       }
@@ -547,6 +567,16 @@ export interface CreateBookInput {
   quote?: string;
   tags?: string[];
   textContent: string; // ham TXT içeriği
+  /** Soru noktaları (opsiyonel): belirtilen sayfa bitince soru çıkar */
+  questions?: {
+    page: number;
+    question: string;
+    optionA: string;
+    optionB: string;
+    optionC: string;
+    optionD: string;
+    correctOption: QuizOption;
+  }[];
 }
 
 const slugify = (title: string): string => {
@@ -570,7 +600,9 @@ const slugify = (title: string): string => {
  * TXT içeriğini otomatik sayfalara böler ve kitabı veritabanına kaydeder.
  * Her content[i] elemanı bir sayfanın tam metnidir.
  */
-export const createBookFromText = async (input: CreateBookInput): Promise<{ success: boolean; pageCount?: number }> => {
+export const createBookFromText = async (
+  input: CreateBookInput
+): Promise<{ success: boolean; pageCount?: number; questionsSaved?: boolean }> => {
   const pages = splitTextIntoPages(input.textContent);
 
   if (pages.length === 0) {
@@ -596,13 +628,114 @@ export const createBookFromText = async (input: CreateBookInput): Promise<{ succ
     console.error('Kitap kaydedilemedi:', error);
     return { success: false };
   }
-  return { success: true, pageCount: pages.length };
+
+  // Soru noktalarını kaydet
+  if (input.questions && input.questions.length > 0) {
+    const validQuestions = input.questions.filter(
+      (q) => q.question.trim() && q.optionA.trim() && q.optionB.trim() && q.optionC.trim() && q.optionD.trim() && q.page > 0
+    );
+
+    if (validQuestions.length > 0) {
+      const { error: qError } = await supabase.from('book_questions').insert(
+        validQuestions.map((q) => ({
+          book_id: id,
+          page: q.page,
+          question: q.question.trim(),
+          option_a: q.optionA,
+          option_b: q.optionB,
+          option_c: q.optionC,
+          option_d: q.optionD,
+          correct_option: q.correctOption,
+        }))
+      );
+
+      if (qError) {
+        console.error('Sorular kaydedilemedi:', qError);
+        return { success: true, pageCount: pages.length, questionsSaved: false };
+      }
+    }
+  }
+
+  return { success: true, pageCount: pages.length, questionsSaved: true };
 };
 
 export const deleteBook = async (bookId: string): Promise<boolean> => {
   const { error } = await supabase.from('books').delete().eq('id', bookId);
   if (error) {
     console.error('Kitap silinemedi:', error);
+    return false;
+  }
+  return true;
+};
+
+// --- SORU NOKTALARI ---
+
+interface QuestionRow {
+  id: string;
+  book_id: string;
+  page: number;
+  question: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_option: QuizOption;
+  question_answers: { user_id: string; selected_option: QuizOption; is_correct: boolean }[];
+}
+
+/** Kitabın sorularını öğrencinin önceki cevaplarıyla birlikte getirir */
+export const fetchQuestionsForBook = async (
+  bookId: string,
+  userId?: string
+): Promise<BookQuestion[]> => {
+  const { data, error } = await supabase
+    .from('book_questions')
+    .select('*, question_answers(user_id, selected_option, is_correct)')
+    .eq('book_id', bookId)
+    .order('page', { ascending: true });
+
+  if (error) {
+    console.error('Sorular çekilemedi:', error);
+    return [];
+  }
+
+  return (((data as unknown as QuestionRow[]) || [])).map((row) => {
+    const myAnswer = userId
+      ? row.question_answers?.find((a) => a.user_id === userId)
+      : undefined;
+
+    return {
+      id: row.id,
+      bookId: row.book_id,
+      page: row.page,
+      question: row.question,
+      options: [
+        { key: 'A' as QuizOption, text: row.option_a },
+        { key: 'B' as QuizOption, text: row.option_b },
+        { key: 'C' as QuizOption, text: row.option_c },
+        { key: 'D' as QuizOption, text: row.option_d },
+      ],
+      correctOption: row.correct_option,
+      mySelected: myAnswer?.selected_option ?? null,
+    };
+  });
+};
+
+export const saveQuestionAnswer = async (
+  questionId: string,
+  userId: string,
+  selectedOption: QuizOption,
+  isCorrect: boolean
+): Promise<boolean> => {
+  const { error } = await supabase.from('question_answers').insert({
+    question_id: questionId,
+    user_id: userId,
+    selected_option: selectedOption,
+    is_correct: isCorrect,
+  });
+
+  if (error) {
+    console.error('Cevap kaydedilemedi:', error);
     return false;
   }
   return true;

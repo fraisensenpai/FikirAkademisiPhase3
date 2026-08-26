@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Book, Note } from '../types';
+import { Book, Note, BookQuestion, QuizOption } from '../types';
 import { detectChapterTitle } from '../lib/textSplitter';
+import { fetchQuestionsForBook, saveQuestionAnswer } from '../lib/dataService';
 import { useToast } from './Toast';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import {
   ArrowLeft,
   Sliders,
@@ -26,6 +28,7 @@ import {
 
 interface BookReaderProps {
   book: Book;
+  userId: string;
   onBack: () => void;
   notes: Note[];
   onAddNote: (note: Omit<Note, 'id' | 'createdAt'>) => void;
@@ -43,6 +46,7 @@ const FLUSH_INTERVAL_SECONDS = 20;
 
 export const BookReader: React.FC<BookReaderProps> = ({
   book,
+  userId,
   onBack,
   notes,
   onAddNote,
@@ -95,6 +99,21 @@ export const BookReader: React.FC<BookReaderProps> = ({
   const currentPageRef = useRef(currentPage);
   currentPageRef.current = currentPage;
 
+  // --- Soru noktaları ---
+  const [questions, setQuestions] = useState<BookQuestion[]>([]);
+  const [quiz, setQuiz] = useState<{ items: BookQuestion[]; index: number; targetPage: number } | null>(null);
+  const [selectedOption, setSelectedOption] = useState<QuizOption | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchQuestionsForBook(book.id, userId).then((qs) => {
+      if (mounted) setQuestions(qs);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [book.id, userId]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       // Sekme arka plandayken/görünür değilken süre işlemez ("açık bırakma" hilesine karşı)
@@ -126,6 +145,15 @@ export const BookReader: React.FC<BookReaderProps> = ({
     }
   };
 
+  /** Gerçek sayfa geçişi */
+  const performAdvance = (page: number) => {
+    lastFlipAtRef.current = Date.now();
+    flushPendingSeconds();
+    const clamped = Math.max(1, Math.min(page, totalPages || page));
+    setCurrentPage(clamped);
+    onSaveProgress(book.id, clamped);
+  };
+
   const handlePageChange = (page: number) => {
     const elapsed = (Date.now() - lastFlipAtRef.current) / 1000;
 
@@ -135,12 +163,43 @@ export const BookReader: React.FC<BookReaderProps> = ({
       return;
     }
 
-    lastFlipAtRef.current = Date.now();
-    flushPendingSeconds();
+    // Soru kapısı: bu sayfayı bitirmiş olunan cevaplanmamış soru var mı?
+    if (page > currentPageRef.current) {
+      const pendingQs = questions.filter(
+        (q) => q.page === currentPageRef.current && !q.mySelected
+      );
+      if (pendingQs.length > 0) {
+        setSelectedOption(null);
+        setQuiz({ items: pendingQs, index: 0, targetPage: page });
+        return;
+      }
+    }
 
-    const clamped = Math.max(1, Math.min(page, totalPages || page));
-    setCurrentPage(clamped);
-    onSaveProgress(book.id, clamped);
+    performAdvance(page);
+  };
+
+  const handleQuizAnswer = async (opt: QuizOption) => {
+    if (!quiz || selectedOption) return;
+    setSelectedOption(opt);
+
+    const q = quiz.items[quiz.index];
+    const isCorrect = opt === q.correctOption;
+
+    // Lokal olarak işaretle (tekrar sormasın)
+    setQuestions((prev) =>
+      prev.map((x) => (x.id === q.id ? { ...x, mySelected: opt } : x))
+    );
+
+    await saveQuestionAnswer(q.id, userId, opt, isCorrect);
+
+    showToast(isCorrect ? 'Doğru cevap! 🎉' : 'Yanlış cevap 😔 Doğrusunu görebilirsin.', isCorrect ? 'success' : 'error');
+  };
+
+  const finishQuiz = () => {
+    const target = quiz?.targetPage ?? currentPage + 1;
+    setQuiz(null);
+    setSelectedOption(null);
+    performAdvance(target);
   };
 
   const handleSaveNote = (e: React.FormEvent) => {
@@ -641,6 +700,94 @@ export const BookReader: React.FC<BookReaderProps> = ({
           </aside>
         )}
       </div>
+
+      {/* Quiz Modal (soru kapısı) */}
+      {quiz && (
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 text-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                  <HelpCircle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-base text-[#091426]">
+                    Soru Noktası
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Sayfa {quiz.items[quiz.index].page} • Soru {quiz.index + 1}/{quiz.items.length}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {(() => {
+              const q = quiz.items[quiz.index];
+              const answered = selectedOption !== null;
+              return (
+                <>
+                  <p className="text-sm font-semibold text-[#091426] leading-relaxed">{q.question}</p>
+
+                  <div className="space-y-2">
+                    {q.options.map((opt) => {
+                      const isSelected = selectedOption === opt.key;
+                      const isCorrectOpt = opt.key === q.correctOption;
+                      let cls = 'border-slate-200 hover:border-[#091426] hover:bg-slate-50';
+                      if (answered && isCorrectOpt) cls = 'border-emerald-400 bg-emerald-50';
+                      else if (answered && isSelected) cls = 'border-red-300 bg-red-50';
+                      else if (answered) cls = 'border-slate-200 opacity-50';
+
+                      return (
+                        <button
+                          key={opt.key}
+                          onClick={() => handleQuizAnswer(opt.key)}
+                          disabled={answered}
+                          className={`w-full flex items-center justify-between gap-2 p-3 border rounded-xl text-left text-xs font-medium transition-all disabled:cursor-default ${cls}`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-[10px] font-bold shrink-0">
+                              {opt.key}
+                            </span>
+                            {opt.text}
+                          </span>
+                          {answered && isCorrectOpt && (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          )}
+                          {answered && isSelected && !isCorrectOpt && (
+                            <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {answered && (
+                    <button
+                      onClick={() => {
+                        if (quiz.index + 1 < quiz.items.length) {
+                          setSelectedOption(null);
+                          setQuiz({ ...quiz, index: quiz.index + 1 });
+                        } else {
+                          finishQuiz();
+                        }
+                      }}
+                      className="w-full py-2.5 bg-[#091426] hover:bg-[#1e293b] text-white rounded-xl text-xs font-bold transition-colors"
+                    >
+                      {quiz.index + 1 < quiz.items.length ? 'Sonraki Soru' : 'Okumaya Devam Et →'}
+                    </button>
+                  )}
+
+                  {!answered && (
+                    <p className="text-[11px] text-slate-400 text-center">
+                      Cevabını seç — doğru/yanlış anında görülür ve öğretmenine kaydedilir.
+                    </p>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Floating Action Button: AI Assistant (Bottom Right) */}
       <button

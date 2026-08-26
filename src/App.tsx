@@ -206,6 +206,7 @@ export default function App() {
         {currentScreen === 'reader' && selectedBook && (
           <BookReader
             book={selectedBook}
+            userId={user.id}
             onBack={() => setCurrentScreen('library')}
             notes={notes}
             onAddNote={handleAddNote}

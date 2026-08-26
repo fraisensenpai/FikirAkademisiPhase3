@@ -371,6 +371,20 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                   ? ' • Tamamladı 🎉'
                                   : ` • ${bp.totalPages - bp.lastPage} sayfa kaldı`}
                               </p>
+                              {bp.questionTotal > 0 && (
+                                <p
+                                  className={`text-[10px] font-bold mt-0.5 ${
+                                    bp.questionCorrect === bp.questionTotal
+                                      ? 'text-emerald-700'
+                                      : bp.questionCorrect / bp.questionTotal >= 0.5
+                                      ? 'text-slate-600'
+                                      : 'text-red-500'
+                                  }`}
+                                >
+                                  🧠 Soru Puanı: {bp.questionCorrect}/{bp.questionTotal} doğru (
+                                  {Math.round((bp.questionCorrect / bp.questionTotal) * 100)} puan)
+                                </p>
+                              )}
                             </div>
                           ))}
                         </div>

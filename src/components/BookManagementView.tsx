@@ -1,8 +1,28 @@
 import React, { useRef, useState } from 'react';
-import { Book } from '../types';
-import { Upload, FileText, Trash2, BookPlus, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Book, QuizOption } from '../types';
+import { Upload, FileText, Trash2, BookPlus, CheckCircle2, AlertCircle, HelpCircle, Plus, X } from 'lucide-react';
 import { createBookFromText, deleteBook } from '../lib/dataService';
 import { splitTextIntoPages } from '../lib/textSplitter';
+
+interface QuestionDraft {
+  page: string;
+  question: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  correct: QuizOption;
+}
+
+const emptyQuestion = (): QuestionDraft => ({
+  page: '',
+  question: '',
+  optionA: '',
+  optionB: '',
+  optionC: '',
+  optionD: '',
+  correct: 'A',
+});
 
 interface BookManagementViewProps {
   books: Book[];
@@ -24,6 +44,10 @@ export const BookManagementView: React.FC<BookManagementViewProps> = ({
   const [coverUrl, setCoverUrl] = useState('');
   const [textContent, setTextContent] = useState('');
   const [fileName, setFileName] = useState('');
+
+  // Soru noktaları
+  const [questions, setQuestions] = useState<QuestionDraft[]>([]);
+  const [showQuestionEditor, setShowQuestionEditor] = useState(false);
 
   // Durum
   const [saving, setSaving] = useState(false);
@@ -74,13 +98,25 @@ export const BookManagementView: React.FC<BookManagementViewProps> = ({
       description: description.trim(),
       coverUrl: coverUrl.trim() || undefined,
       textContent,
+      questions: questions.map((q) => ({
+        page: parseInt(q.page, 10) || 0,
+        question: q.question,
+        optionA: q.optionA,
+        optionB: q.optionB,
+        optionC: q.optionC,
+        optionD: q.optionD,
+        correctOption: q.correct,
+      })),
     });
     setSaving(false);
 
     if (result.success) {
+      const qCount = questions.filter((q) => q.question.trim()).length;
       setFeedback({
         type: 'ok',
-        msg: `"${title}" yüklendi! ${result.pageCount} sayfaya bölündü.`,
+        msg:
+          `"${title}" yüklendi! ${result.pageCount} sayfaya bölündü.` +
+          (qCount > 0 ? ` ${qCount} soru noktası eklendi.` : ''),
       });
       setTitle('');
       setAuthor('');
@@ -88,6 +124,8 @@ export const BookManagementView: React.FC<BookManagementViewProps> = ({
       setCoverUrl('');
       setTextContent('');
       setFileName('');
+      setQuestions([]);
+      setShowQuestionEditor(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
       onBookAdded();
     } else {
@@ -282,6 +320,129 @@ export const BookManagementView: React.FC<BookManagementViewProps> = ({
           <BookPlus className="w-4 h-4" />
           {saving ? 'Yükleniyor...' : 'Kitabı Yayınla'}
         </button>
+
+        {/* Soru Noktaları Editörü */}
+        <div className="border border-slate-200 rounded-xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowQuestionEditor(!showQuestionEditor)}
+            className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+          >
+            <span className="text-xs font-bold text-slate-700 flex items-center gap-2">
+              <HelpCircle className="w-4 h-4 text-indigo-600" />
+              Soru Noktaları ({questions.length})
+            </span>
+            <span className="text-[11px] font-semibold text-slate-500">
+              {showQuestionEditor ? 'Kapat' : 'Ekle'}
+            </span>
+          </button>
+
+          {showQuestionEditor && (
+            <div className="p-3 space-y-3 bg-white">
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Öğrenci belirtilen sayfayı bitirince soru ekrana gelir ve
+                cevaplamadan sonraki sayfaya geçemez. Öğretmen panelinden kimin
+                kaç soruyu doğru yaptığını görebilirsin.
+              </p>
+
+              {questions.map((q, idx) => (
+                <div key={idx} className="border border-slate-200 rounded-xl p-3 space-y-2 relative">
+                  <button
+                    type="button"
+                    onClick={() => setQuestions(questions.filter((_, i) => i !== idx))}
+                    className="absolute top-2 right-2 p-1 text-slate-300 hover:text-red-600 transition-colors"
+                    title="Soruyu Kaldır"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-lg shrink-0">
+                      #{idx + 1}
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={previewPages.length || undefined}
+                      required
+                      value={q.page}
+                      onChange={(e) =>
+                        setQuestions(
+                          questions.map((x, i) => (i === idx ? { ...x, page: e.target.value } : x))
+                        )
+                      }
+                      placeholder={`Sayfa no (1-${previewPages.length || '?'})`}
+                      className="flex-1 p-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-[#091426] focus:outline-none"
+                    />
+                  </div>
+
+                  <textarea
+                    value={q.question}
+                    onChange={(e) =>
+                      setQuestions(
+                        questions.map((x, i) => (i === idx ? { ...x, question: e.target.value } : x))
+                      )
+                    }
+                    rows={2}
+                    placeholder="Soru metni..."
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-2 focus:ring-[#091426] focus:outline-none resize-none"
+                  />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['optionA', 'optionB', 'optionC', 'optionD'] as const).map((opt, oi) => {
+                      const key = ['A', 'B', 'C', 'D'][oi] as QuizOption;
+                      return (
+                        <div key={opt} className="flex items-center gap-1.5">
+                          <input
+                            type="radio"
+                            name={`correct-${idx}`}
+                            checked={q.correct === key}
+                            onChange={() =>
+                              setQuestions(
+                                questions.map((x, i) => (i === idx ? { ...x, correct: key } : x))
+                              )
+                            }
+                            className="accent-emerald-600"
+                            title="Doğru cevap olarak işaretle"
+                          />
+                          <span className="text-[10px] font-bold text-slate-400">{key})</span>
+                          <input
+                            type="text"
+                            value={q[opt]}
+                            onChange={(e) =>
+                              setQuestions(
+                                questions.map((x, i) => (i === idx ? { ...x, [opt]: e.target.value } : x))
+                              )
+                            }
+                            placeholder={`${key} şıkkı`}
+                            className="flex-1 min-w-0 p-1.5 bg-white border border-slate-200 rounded-lg text-[11px] text-slate-800 focus:ring-2 focus:ring-[#091426] focus:outline-none"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-slate-400">● Doğru şık olarak işaretlenen: {q.correct}</p>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setQuestions([...questions, emptyQuestion()])}
+                disabled={previewPages.length === 0}
+                className="w-full py-2 border-2 border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50 rounded-xl text-xs font-bold text-slate-600 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-40"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Soru Ekle
+              </button>
+
+              {previewPages.length === 0 && (
+                <p className="text-[10px] text-amber-600 font-semibold text-center">
+                  Soru ekleyebilmek için önce kitap metnini gir (sayfa sayısına göre sınır belirlenir).
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </form>
 
       {/* Existing Books */}

@@ -30,6 +30,9 @@ export interface StudentBookProgress {
   totalPages: number;
   progressPercent: number;
   secondsRead: number;
+  /** Ulaşılan soru noktalarında doğru cevap sayısı */
+  questionCorrect: number;
+  questionTotal: number;
   updatedAt: string;
 }
 
@@ -71,6 +74,21 @@ export interface Assignment {
   totalStudents: number;
   completedStudents: number;
   avgProgress: number;
+}
+
+export type QuizOption = 'A' | 'B' | 'C' | 'D';
+
+/** Geliştiricinin kitaba eklediği soru noktası */
+export interface BookQuestion {
+  id: string;
+  bookId: string;
+  /** Bu sayfa bitirilince soru çıkar */
+  page: number;
+  question: string;
+  options: { key: QuizOption; text: string }[];
+  correctOption: QuizOption;
+  /** Öğrencinin önceki cevabı (yoksa null) */
+  mySelected?: QuizOption | null;
 }
 
 export interface Post {
