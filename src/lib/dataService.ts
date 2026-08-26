@@ -519,6 +519,23 @@ export const fetchClasses = async (): Promise<string[]> => {
   return classes.sort();
 };
 
+/** Giriş yapan kullanıcının profil bilgisi (sınıf filtresi için) */
+export const fetchMyProfile = async (
+  userId: string
+): Promise<{ fullName: string; classGrade: string } | null> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('full_name, class_grade')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return {
+    fullName: data.full_name || '',
+    classGrade: data.class_grade || '',
+  };
+};
+
 // --- GELİŞTİRİCİ: KİTAP YÜKLEME ---
 
 export interface CreateBookInput {

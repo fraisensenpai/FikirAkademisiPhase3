@@ -23,6 +23,7 @@ import {
   createAssignment,
   saveReadingProgress,
   addReadingSeconds,
+  fetchMyProfile,
 } from './lib/dataService';
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
   const [students, setStudents] = useState<StudentProgress[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [classes, setClasses] = useState<string[]>([]);
+  const [myClassGrade, setMyClassGrade] = useState<string>('');
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -45,14 +47,22 @@ export default function App() {
     const fetchedNotes = await fetchNotes(user.id);
     setNotes(fetchedNotes);
 
+    // Ödevleri her rol için çek (öğrenciler kendi sınıfının ödevini görmeli)
+    const fetchedAssignments = await fetchAssignments();
+    setAssignments(fetchedAssignments);
+
+    // Öğrencinin kendi sınıfı (ödev filtresi için)
+    if (userRole === 'student') {
+      const profile = await fetchMyProfile(user.id);
+      setMyClassGrade(profile?.classGrade || '');
+    }
+
     if (userRole === 'teacher') {
-      const [fetchedStudents, fetchedAssignments, fetchedClasses] = await Promise.all([
+      const [fetchedStudents, fetchedClasses] = await Promise.all([
         fetchStudentsWithProgress(),
-        fetchAssignments(),
         fetchClasses(),
       ]);
       setStudents(fetchedStudents);
-      setAssignments(fetchedAssignments);
       setClasses(fetchedClasses);
     }
   }, [user, userRole]);
@@ -187,7 +197,8 @@ export default function App() {
         {currentScreen === 'library' && (
           <LibraryView
             books={books}
-            assignments={activeRole === 'student' ? assignments : []}
+            assignments={activeRole === 'student' ? assignments.filter((a) => a.targetClass === myClassGrade) : []}
+            studentClass={myClassGrade}
             onSelectBook={handleSelectBook}
           />
         )}

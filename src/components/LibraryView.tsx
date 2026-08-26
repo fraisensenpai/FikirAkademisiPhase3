@@ -5,10 +5,12 @@ import { Search, Clock, BookOpen, ClipboardList } from 'lucide-react';
 interface LibraryViewProps {
   books: Book[];
   assignments: Assignment[];
+  /** Öğrencinin sınıfı - boşsa tüm ödevler gösterilir */
+  studentClass?: string;
   onSelectBook: (book: Book) => void;
 }
 
-export const LibraryView: React.FC<LibraryViewProps> = ({ books, assignments, onSelectBook }) => {
+export const LibraryView: React.FC<LibraryViewProps> = ({ books, assignments, studentClass, onSelectBook }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Tümü');
 
@@ -74,10 +76,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ books, assignments, on
             <div className="text-center py-6 bg-white rounded-2xl border border-slate-200 p-5">
               <ClipboardList className="w-8 h-8 text-slate-300 mx-auto mb-2" />
               <p className="text-xs font-semibold text-slate-600">
-                Şu anda atanmış bir ödevin yok.
+                {studentClass
+                  ? 'Şu anda sınıfına atanmış bir ödevin yok.'
+                  : 'Ödevlerini görebilmek için sınıf bilgin gerekiyor.'}
               </p>
               <p className="text-[11px] text-slate-400 mt-1">
-                Öğretmenin ödev atadığında burada görünecek.
+                {studentClass
+                  ? 'Öğretmenin ödev atadığında burada görünecek.'
+                  : 'Öğretmenin sınıf listesine eklendiğinde ödevler burada görünecek.'}
               </p>
             </div>
           )}
