@@ -40,7 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
             <div className="text-left hidden sm:block">
               <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                {userRole === 'student' ? 'Öğrenci' : 'Öğretmen'}
+                {userRole === 'student' ? 'Öğrenci' : userRole === 'developer' ? 'Geliştirici' : 'Öğretmen'}
               </span>
               <span className="block text-sm font-bold text-[#091426] leading-tight">
                 {userName || 'Kullanıcı'}
@@ -65,10 +65,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             className={`px-3 py-1.5 rounded-full text-[11px] font-bold ${
               userRole === 'teacher'
                 ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                : userRole === 'developer'
+                ? 'bg-amber-50 text-amber-700 border border-amber-200'
                 : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
             }`}
           >
-            {userRole === 'teacher' ? 'Öğretmen' : 'Öğrenci'}
+            {userRole === 'teacher' ? 'Öğretmen' : userRole === 'developer' ? 'Geliştirici' : 'Öğrenci'}
           </span>
         </div>
       </div>

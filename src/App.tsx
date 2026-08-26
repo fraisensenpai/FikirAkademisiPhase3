@@ -231,6 +231,8 @@ export default function App() {
             userRole={activeRole}
             setCurrentScreen={setCurrentScreen}
             books={books}
+            onSelectBook={handleSelectBook}
+            onNavigateToLibrary={() => setCurrentScreen('library')}
           />
         )}
       </div>
