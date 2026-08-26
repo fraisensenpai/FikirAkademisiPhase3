@@ -93,11 +93,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ books, assignments, on
               >
                 {/* Book Cover Thumbnail */}
                 <div className="w-18 h-24 shrink-0 rounded-xl overflow-hidden shadow-sm border border-slate-200 bg-slate-50 flex items-center justify-center p-1 relative">
-                  <img
-                    src={book.coverUrl}
-                    alt={book.title}
-                    className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition-transform duration-300"
-                  />
+                  {book.coverUrl ? (
+                    <img
+                      src={book.coverUrl}
+                      alt={book.title}
+                      className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-lg bg-[#091426] text-white flex items-center justify-center font-bold">
+                      {book.title.charAt(0)}
+                    </div>
+                  )}
                 </div>
 
                 {/* Info & Progress */}
@@ -194,11 +200,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ books, assignments, on
               {/* Cover Art Area */}
               <div className="h-48 bg-slate-100/70 p-3.5 flex items-center justify-center border-b border-slate-100 relative overflow-hidden">
                 <div className="w-28 h-40 rounded-lg overflow-hidden shadow-md border border-slate-200 bg-white group-hover:scale-105 transition-transform duration-300">
-                  <img
-                    src={book.coverUrl}
-                    alt={book.title}
-                    className="w-full h-full object-cover"
-                  />
+                  {book.coverUrl ? (
+                    <img
+                      src={book.coverUrl}
+                      alt={book.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-[#091426] text-white flex items-center justify-center font-bold text-2xl">
+                      {book.title.charAt(0)}
+                    </div>
+                  )}
                 </div>
                 {assignments.some((a) => a.bookId === book.id) && (
                   <span className="absolute top-2 right-2 px-2 py-0.5 bg-emerald-700 text-white text-[10px] font-bold rounded-full shadow-xs">

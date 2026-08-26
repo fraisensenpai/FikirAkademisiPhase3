@@ -9,6 +9,7 @@ import {
   Calendar,
   X,
   ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 interface TeacherDashboardProps {
@@ -36,6 +37,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [selectedClass, setSelectedClass] = useState<string>(classes[0] || 'Tümü');
   const [statusFilter, setStatusFilter] = useState<string>('Tümü');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -304,6 +306,55 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       style={{ width: `${student.progressPercent}%` }}
                     ></div>
                   </div>
+
+                  {/* Kitap bazında detay (hangi sayfada kalmış?) */}
+                  {student.bookProgress && student.bookProgress.length > 0 && (
+                    <div className="mt-2.5">
+                      <button
+                        onClick={() =>
+                          setExpandedStudentId(expandedStudentId === student.id ? null : student.id)
+                        }
+                        className="w-full flex items-center justify-center gap-1 text-[11px] font-bold text-slate-500 hover:text-emerald-700 py-1 transition-colors"
+                      >
+                        <BookOpen className="w-3 h-3" />
+                        {expandedStudentId === student.id ? 'Detayı Gizle' : 'Kitap Bazında Detay'}
+                        {expandedStudentId === student.id ? (
+                          <ChevronUp className="w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="w-3 h-3" />
+                        )}
+                      </button>
+
+                      {expandedStudentId === student.id && (
+                        <div className="mt-2 space-y-2 bg-slate-50 rounded-xl p-3 border border-slate-100">
+                          {student.bookProgress.map((bp) => (
+                            <div key={bp.bookId}>
+                              <div className="flex justify-between items-center text-[11px] mb-1">
+                                <span className="font-bold text-[#091426] truncate">{bp.bookTitle}</span>
+                                <span className="text-slate-600 font-semibold shrink-0 ml-2">
+                                  Sayfa {bp.lastPage} / {bp.totalPages} (%{bp.progressPercent})
+                                </span>
+                              </div>
+                              <div className="w-full bg-white h-1.5 rounded-full overflow-hidden border border-slate-100">
+                                <div
+                                  className={`h-full rounded-full ${
+                                    bp.progressPercent >= 100 ? 'bg-[#006c49]' : 'bg-[#1e293b]'
+                                  }`}
+                                  style={{ width: `${bp.progressPercent}%` }}
+                                ></div>
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                Son aktivite: {bp.updatedAt}
+                                {bp.progressPercent >= 100
+                                  ? ' • Tamamladı 🎉'
+                                  : ` • ${bp.totalPages - bp.lastPage} sayfa kaldı`}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

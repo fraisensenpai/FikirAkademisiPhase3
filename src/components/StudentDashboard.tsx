@@ -109,11 +109,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               {/* Book Thumbnail */}
               <div className="w-20 h-28 shrink-0 rounded-xl overflow-hidden shadow-sm border border-slate-200 bg-slate-100 relative group cursor-pointer"
                    onClick={() => onSelectBook(continueBook)}>
-                <img
-                  src={continueBook.coverUrl}
-                  alt={continueBook.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
+                {continueBook.coverUrl ? (
+                  <img
+                    src={continueBook.coverUrl}
+                    alt={continueBook.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-[#091426] text-white flex items-center justify-center font-bold text-xl">
+                    {continueBook.title.charAt(0)}
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-black/10"></div>
               </div>
 
@@ -180,11 +186,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 {/* Cover Preview Area */}
                 <div className="h-44 bg-slate-50 relative p-3 flex items-center justify-center border-b border-slate-100">
                   <div className="w-24 h-36 rounded-md overflow-hidden shadow-md border border-slate-200 group-hover:scale-105 transition-transform duration-300">
-                    <img
-                      src={book.coverUrl}
-                      alt={book.title}
-                      className="w-full h-full object-cover"
-                    />
+                    {book.coverUrl ? (
+                      <img
+                        src={book.coverUrl}
+                        alt={book.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-[#091426] text-white flex items-center justify-center font-bold text-2xl">
+                        {book.title.charAt(0)}
+                      </div>
+                    )}
                   </div>
                 </div>
 

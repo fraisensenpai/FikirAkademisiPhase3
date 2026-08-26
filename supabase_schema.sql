@@ -20,7 +20,7 @@ drop table if exists public.profiles cascade;
 -- ============================================================
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  role text not null default 'student' check (role in ('student', 'teacher')),
+  role text not null default 'student' check (role in ('student', 'teacher', 'developer')),
   full_name text,
   class_grade text,
   school_number text,
@@ -58,7 +58,7 @@ create table public.books (
   title text not null,
   author text not null,
   category text not null check (category in ('Klasikler', 'Bilim', 'Tarih', 'Felsefe', 'Psikoloji', 'Edebiyat')),
-  cover_url text not null,
+  cover_url text not null default '',
   total_pages integer not null default 0,
   description text default '',
   chapter_title text,
@@ -168,8 +168,17 @@ alter table public.club_members enable row level security;
 create policy "profiles_select" on public.profiles for select to authenticated using (true);
 create policy "profiles_update_own" on public.profiles for update to authenticated using (auth.uid() = id);
 
--- BOOKS: giriş yapan herkes okuyabilir
+-- BOOKS: giriş yapan herkes okuyabilir; kitap ekleme/silme sadece geliştiricide
 create policy "books_select" on public.books for select to authenticated using (true);
+create policy "books_insert_developer" on public.books for insert to authenticated with check (
+  exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'developer')
+);
+create policy "books_update_developer" on public.books for update to authenticated using (
+  exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'developer')
+);
+create policy "books_delete_developer" on public.books for delete to authenticated using (
+  exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'developer')
+);
 
 -- NOTES: kullanıcı sadece kendi notları
 create policy "notes_select_own" on public.notes for select to authenticated using (auth.uid() = user_id);
@@ -211,18 +220,9 @@ create policy "members_insert_own" on public.club_members for insert to authenti
 create policy "members_delete_own" on public.club_members for delete to authenticated using (auth.uid() = user_id);
 
 -- ============================================================
--- 9. BAŞLANGIÇ KİTAP VERİLERİ
+-- 9. BAŞLANGIÇ VERİLERİ
+-- (Kitaplar geliştirici panelinden TXT olarak yüklenir, seed yoktur)
 -- ============================================================
-insert into public.books (id, title, author, category, cover_url, total_pages, description, chapter_title, chapter_subtitle, illustration_url, quote, content, tags) values
-('insan-neyle-yasar', 'İnsan Neyle Yaşar?', 'Lev Tolstoy', 'Klasikler', 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=600&auto=format&fit=crop&q=80', 180, 'Yaşamın anlamını arayan bir adamın, basit bir çiftçi aracılığıyla bulduğu derin hikaye.', 'Bölüm 1', 'Yoldaşlar', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80', '"İnsan sevgiyle yaşar, sevgi olmadan hayatı sürer, yaşamaz."', array['İnsanlar birbirlerinden nefret ederler, çünkü birbirlerinden korkarlar; birbirlerinden korkarlar, çünkü birbirlerini tanımazlar; birbirlerini tanımazlar, çünkü birbirleriyle temas etmezler.', 'Gerçek hayattan kaçmak için kitap okumak, hayatı anlamak için kitap okumaktan çok farklı bir şeydir.'], array['Felsefe', 'Yaşam', 'Klasik']),
-
-('1984', '1984', 'George Orwell', 'Klasikler', 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=600&auto=format&fit=crop&q=80', 352, 'Totaliter rejimlerin gözetleme toplumunu ve düşünce özgürlüğünün bastırılmasını anlatan kült distopya.', 'Kısım 1: Bölüm 1', 'Büyük Birader Seni İzliyor', 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop&q=80', '"Geçmişi kontrol eden geleceği kontrol eder; bugünü kontrol eden geçmişi kontrol eder."', array['Hava açık ve soğuk bir nisan günüydü; saatler on üçü vuruyordu. Winston Smith, dondurucu rüzgardan kaçmak için çenesini göğsüne gömmüş, camlı kapıdan Hürriyet Apartmanları''na girdi.', 'Koridorun ucunda, her seferinde karşı tarafın duvarında asılı bir poster, Großen Auge''nun (Büyük Göz) gözleriyle takip ediyordu.', 'Winston, midesindeki o acı çeken boşluğu hissetti. Onun için geçmiş, kayıp bir cennetti.'], array['Distopya', 'Politika', 'Gözetleme']),
-
-('sapiens', 'Sapiens: İnsan Türünün Kısa Tarihi', 'Yuval Noah Harari', 'Tarih', 'https://images.unsplash.com/photo-1532012197267-da84d127e765?w=600&auto=format&fit=crop&q=80', 498, 'İnsan türünün avcı-toplayıcıdan günümüz teknoloji çağına uzanan macerasını anlatan devasa bir tarih öyküsü.', 'Bölüm 1', 'Bilişsel Devrim', 'https://images.unsplash.com/photo-1476275466078-4007374efbbe?w=800&auto=format&fit=crop&q=80', '"Biz hayal edebildiğimiz her şeyi yaratabiliriz."', array['Yaklaşık 70.000 yıl önce, Homo sapiens türü Bilişsel Devrim geçirdi. Bu devrim, hayal edebilme yeteneğini getirdi.', 'Hayal gücü, sapiens''in büyük gruplarda işbirliği yapmasını sağlayan tek şeydir. Dinler, uluslar, para, kanunlar hepsi "ortak hayaller"dir.'], array['Tarih', 'Antropoloji', 'Bilim']),
-
-('donusum', 'Dönüşüm', 'Franz Kafka', 'Edebiyat', 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=600&auto=format&fit=crop&q=80', 128, 'Bir gecenin sabahı uyandığında dev bir böceğe dönüşmüş olan Gregor Samsa''nın trajik hikayesi.', 'Bölüm 1', 'Dönüşüm', 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=800&auto=format&fit=crop&q=80', '"Ben bir böceğim, öyle bir böceğim ki..."', array['Bir sabah, Gregor Samsa huzursuz rüyalarından uyanınca, yatağında dev bir böceğe dönüşmüş olduğunu fark etti.', 'Sert, zırhlı sırtı ve karıncasına bacaklarıyla yatağının üzerinde yatıyordu.'], array['Varoluşçuluk', 'Aile', 'Absürd']),
-
-('arch-happiness', 'The Architecture of Happiness', 'Alain de Botton', 'Felsefe', 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80', 320, 'Binaların, mekanların ve mimarinin insan psikolojisi ve mutluluğu üzerindeki derin etkilerini inceleyen felsefi bir başyapıt.', 'Chapter 3', 'The Importance of Shelter', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80', '"We need our rooms to align us to desirable versions of ourselves."', array['It is an enduring human trait to seek spaces that reflect our aspirations. The buildings we inhabit are not merely physical shelters; they are psychological armatures.', 'Consider the difference between a cramped, poorly lit corridor and a sweeping, sunlit atrium. The former may induce anxiety, while the latter can inspire a sense of possibility.'], array['Mimarlık', 'Felsefe', 'Psikoloji']);
 
 -- Örnek kulüpler
 insert into public.clubs (name, description, cover_url) values

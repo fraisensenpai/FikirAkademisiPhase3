@@ -25,7 +25,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const extractUserRole = (currentUser: User): UserRole => {
     const role = currentUser.user_metadata?.role as UserRole;
-    return role === 'teacher' ? 'teacher' : 'student';
+    return role === 'teacher' || role === 'developer' ? role : 'student';
   };
 
   const extractUserName = (currentUser: User): string => {

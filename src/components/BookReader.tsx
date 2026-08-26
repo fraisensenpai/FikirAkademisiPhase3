@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Book, Note } from '../types';
+import { detectChapterTitle } from '../lib/textSplitter';
 import {
   ArrowLeft,
   Sliders,
@@ -72,30 +73,13 @@ export const BookReader: React.FC<BookReaderProps> = ({
   const bookNotes = notes.filter((n) => n.bookId === book.id);
   const progressPercent = Math.min(100, Math.round((currentPage / (book.totalPages || 320)) * 100));
 
-  // İçindekiler: içeriği paragraf gruplarına bölerek oluştur
-  const chapters = useMemo(() => {
-    const content = book.content || [];
-    if (content.length === 0) {
-      return [{ title: book.chapterTitle || 'Bölüm 1', page: 1 }];
-    }
-    const chunkSize = 2;
-    const result: { title: string; page: number; startPara: number }[] = [];
-    for (let i = 0; i < content.length; i += chunkSize) {
-      const chapterIndex = Math.floor(i / chunkSize) + 1;
-      const approxPage = Math.max(1, Math.round((chapterIndex / Math.ceil(content.length / chunkSize)) * (book.totalPages || 100)));
-      result.push({
-        title: `${book.chapterTitle || 'Bölüm'} • Kısım ${chapterIndex}`,
-        page: Math.min(approxPage, book.totalPages || approxPage),
-        startPara: i,
-      });
-    }
-    return result;
-  }, [book]);
-
-  const [activeChapterStart, setActiveChapterStart] = useState(0);
+  // Her içerik elemanı bir sayfanın tam metnidir
+  const pages = book.content || [];
+  const totalPages = Math.max(pages.length, book.totalPages || 0);
+  const pageText = pages[currentPage - 1] || '';
 
   const handlePageChange = (page: number) => {
-    const clamped = Math.max(1, Math.min(page, book.totalPages || page));
+    const clamped = Math.max(1, Math.min(page, totalPages || page));
     setCurrentPage(clamped);
     onSaveProgress(book.id, clamped);
   };
@@ -210,7 +194,7 @@ export const BookReader: React.FC<BookReaderProps> = ({
             {book.title}
           </h1>
           <p className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5 mt-0.5">
-            <span>Sayfa {currentPage} / {book.totalPages || 320}</span>
+            <span>Sayfa {currentPage} / {totalPages}</span>
             <span className="w-1 h-1 rounded-full bg-slate-300"></span>
             <span className="text-emerald-700 font-bold">%{progressPercent} Okundu</span>
           </p>
@@ -376,24 +360,33 @@ export const BookReader: React.FC<BookReaderProps> = ({
               </button>
             </div>
             <div className="space-y-2 max-h-80 overflow-y-auto">
-              {chapters.map((ch) => (
-                <button
-                  key={ch.startPara}
-                  onClick={() => {
-                    setActiveChapterStart(ch.startPara);
-                    handlePageChange(ch.page);
-                    setShowToc(false);
-                  }}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-sm transition-colors ${
-                    activeChapterStart === ch.startPara
-                      ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200'
-                      : 'hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  <span className="line-clamp-1">{ch.title}</span>
-                  <span className="text-xs text-slate-400">syf. {ch.page}</span>
-                </button>
-              ))}
+              {pages.length > 0 ? (
+                pages.map((pageContent, idx) => {
+                  const pageNum = idx + 1;
+                  const chapterTitle = detectChapterTitle(pageContent);
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => {
+                        handlePageChange(pageNum);
+                        setShowToc(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-sm transition-colors ${
+                        currentPage === pageNum
+                          ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200'
+                          : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <span className="line-clamp-1">
+                        {chapterTitle ? `${chapterTitle} — Sayfa ${pageNum}` : `Sayfa ${pageNum}`}
+                      </span>
+                      <span className="text-xs text-slate-400">syf. {pageNum}</span>
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-slate-500 p-3">Bu kitap için içindekiler bulunmuyor.</p>
+              )}
             </div>
           </div>
         </div>
@@ -412,7 +405,7 @@ export const BookReader: React.FC<BookReaderProps> = ({
                 {book.category} • {book.author}
               </span>
               <h2 className="font-['Plus_Jakarta_Sans'] text-2xl sm:text-3xl font-extrabold text-[#091426] tracking-tight">
-                {book.chapterTitle || 'Chapter 3: The Importance of Shelter'}
+                {book.chapterTitle || book.title}
               </h2>
               {book.chapterSubtitle && (
                 <p className="text-sm font-medium text-slate-500 mt-1">
@@ -421,9 +414,9 @@ export const BookReader: React.FC<BookReaderProps> = ({
               )}
             </div>
 
-            {/* Paragraph Text Content */}
+            {/* Page Text Content */}
             <div
-              className={`leading-relaxed space-y-6 ${
+              className={`leading-relaxed space-y-5 ${
                 fontFamily === 'serif'
                   ? "font-['Lora',serif]"
                   : fontFamily === 'jakarta'
@@ -439,53 +432,42 @@ export const BookReader: React.FC<BookReaderProps> = ({
                   : 'text-xl leading-9'
               }`}
             >
-              {book.content && book.content.length > 0 ? (
+              {pageText ? (
                 <>
-                  {activeChapterStart > 0 && (
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                      {book.chapterTitle || 'Bölüm'} • Kısım {Math.floor(activeChapterStart / 2) + 1}
+                  {/* İlk sayfada kitap tanıtımı ve alıntı */}
+                  {currentPage === 1 && (
+                    <>
+                      {book.description && (
+                        <p className="text-slate-600 italic bg-slate-50/70 p-4 rounded-xl border border-slate-100">
+                          {book.description}
+                        </p>
+                      )}
+                      {book.illustrationUrl && (
+                        <div className="rounded-xl overflow-hidden bg-slate-100 border border-slate-200/80 shadow-xs">
+                          <img
+                            src={book.illustrationUrl}
+                            alt={`${book.title} kapak görseli`}
+                            className="w-full h-64 sm:h-80 object-cover"
+                          />
+                        </div>
+                      )}
+                      {book.quote && (
+                        <blockquote className="border-l-4 border-[#091426] pl-4 sm:pl-6 my-6 italic text-slate-700 font-medium text-base sm:text-lg bg-slate-50/70 p-4 rounded-r-xl">
+                          {book.quote}
+                        </blockquote>
+                      )}
+                    </>
+                  )}
+
+                  {/* Sayfanın asıl metni (paragraflara bölünmüş) */}
+                  {pageText.split(/\n{2,}/).map((para, i) => (
+                    <p key={i} className={i === 0 && currentPage > 1 ? 'indent-8' : ''}>
+                      {para}
                     </p>
-                  )}
-                  {book.content
-                    .slice(activeChapterStart, activeChapterStart + 2)
-                    .map((para, i) => (
-                      <p key={i} className={i === 0 && activeChapterStart === 0 ? 'indent-8' : ''}>
-                        {para}
-                      </p>
-                    ))}
-
-                  {/* Bölüm görseli */}
-                  {book.illustrationUrl && (
-                    <div className="my-8 rounded-xl overflow-hidden bg-slate-100 border border-slate-200/80 shadow-xs relative">
-                      <img
-                        src={book.illustrationUrl}
-                        alt={`${book.title} bölüm görseli`}
-                        className="w-full h-64 sm:h-80 object-cover opacity-95"
-                      />
-                    </div>
-                  )}
-
-                  {/* Styled Blockquote */}
-                  {book.quote && (
-                    <blockquote className="border-l-4 border-[#091426] pl-4 sm:pl-6 my-8 italic text-slate-700 font-medium text-base sm:text-lg bg-slate-50/70 p-4 rounded-r-xl">
-                      {book.quote}
-                    </blockquote>
-                  )}
-
-                  {activeChapterStart === 0 && book.content.length > 2 && (
-                    <button
-                      onClick={() => {
-                        setActiveChapterStart(2);
-                        handlePageChange(Math.min(chapters[1]?.page || currentPage, book.totalPages || currentPage));
-                      }}
-                      className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
-                    >
-                      Devamını Oku <ChevronRight className="w-4 h-4" />
-                    </button>
-                  )}
+                  ))}
                 </>
               ) : (
-                <p>Kitap içeriği yükleniyor...</p>
+                <p className="text-slate-400">Bu sayfa boş veya içerik yüklenmedi.</p>
               )}
             </div>
 
@@ -505,7 +487,7 @@ export const BookReader: React.FC<BookReaderProps> = ({
 
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage >= (book.totalPages || 320)}
+                disabled={currentPage >= totalPages}
                 className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold bg-[#091426] text-white hover:bg-[#1e293b] transition-colors"
               >
                 Sonraki Sayfa <ChevronRight className="w-4 h-4" />

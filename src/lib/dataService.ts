@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
-import type { Book, Note, StudentProgress, Assignment, Post, Club } from '../types';
+import type { Book, Note, StudentProgress, StudentBookProgress, Assignment, Post, Club } from '../types';
+import { splitTextIntoPages } from './textSplitter';
 
 // --- SATIR EŞLEME (snake_case -> camelCase) ---
 
@@ -259,10 +260,13 @@ export const fetchStudentsWithProgress = async (): Promise<StudentProgress[]> =>
   const progressRows = (progress as unknown as ProgressRow[]) || [];
   const assignedBookIds = new Set(((assignments as unknown as { book_id: string }[]) || []).map((a) => a.book_id));
 
-  // Kitap sayfa sayıları (yüzde hesabı için)
-  const { data: bookRows } = await supabase.from('books').select('id, total_pages');
+  // Kitap bilgileri (yüzde hesabı ve başlıklar için)
+  const { data: bookRows } = await supabase.from('books').select('id, total_pages, title');
   const totalPagesMap = new Map<string, number>(
     ((bookRows as unknown as { id: string; total_pages: number }[]) || []).map((b) => [b.id, b.total_pages])
+  );
+  const bookTitleMap = new Map<string, string>(
+    ((bookRows as unknown as { id: string; title: string }[]) || []).map((b) => [b.id, b.title])
   );
 
   return ((profiles as unknown as ProfileRow[]) || []).map((profile) => {
@@ -275,14 +279,27 @@ export const fetchStudentsWithProgress = async (): Promise<StudentProgress[]> =>
 
     let overallPercent = 0;
     let hasCompleted = false;
+    const bookProgress: StudentBookProgress[] = [];
+
     for (const r of userRows) {
       const total = totalPagesMap.get(r.book_id) || 0;
       if (total > 0) {
         const pct = Math.min(100, Math.round((r.last_page / total) * 100));
         if (pct > overallPercent) overallPercent = pct;
         if (pct >= 100 && assignedBookIds.has(r.book_id)) hasCompleted = true;
+        bookProgress.push({
+          bookId: r.book_id,
+          bookTitle: bookTitleMap.get(r.book_id) || r.book_id,
+          lastPage: r.last_page,
+          totalPages: total,
+          progressPercent: pct,
+          updatedAt: timeAgo(r.updated_at),
+        });
       }
     }
+
+    // En son okunan kitap en üstte
+    bookProgress.sort((a, b) => b.progressPercent - a.progressPercent);
 
     const status: StudentProgress['status'] =
       hasCompleted ? 'Tamamladı' : userRows.length > 0 ? 'Devam Ediyor' : 'Başlamadı';
@@ -302,6 +319,7 @@ export const fetchStudentsWithProgress = async (): Promise<StudentProgress[]> =>
       status,
       pagesRead,
       lastActive,
+      bookProgress,
     };
   });
 };
@@ -439,6 +457,78 @@ export const fetchClasses = async (): Promise<string[]> => {
 
   const classes = [...new Set(((data as unknown as { class_grade: string | null }[]) || []).map((r) => r.class_grade).filter(Boolean))] as string[];
   return classes.sort();
+};
+
+// --- GELİŞTİRİCİ: KİTAP YÜKLEME ---
+
+export interface CreateBookInput {
+  title: string;
+  author: string;
+  category: string;
+  description: string;
+  coverUrl?: string;
+  quote?: string;
+  tags?: string[];
+  textContent: string; // ham TXT içeriği
+}
+
+const slugify = (title: string): string => {
+  const map: Record<string, string> = {
+    ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u',
+    Ç: 'c', Ğ: 'g', İ: 'i', Ö: 'o', Ş: 's', Ü: 'u',
+  };
+  return (
+    title
+      .split('')
+      .map((ch) => map[ch] ?? ch)
+      .join('')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 60) || 'kitap'
+  );
+};
+
+/**
+ * TXT içeriğini otomatik sayfalara böler ve kitabı veritabanına kaydeder.
+ * Her content[i] elemanı bir sayfanın tam metnidir.
+ */
+export const createBookFromText = async (input: CreateBookInput): Promise<{ success: boolean; pageCount?: number }> => {
+  const pages = splitTextIntoPages(input.textContent);
+
+  if (pages.length === 0) {
+    return { success: false };
+  }
+
+  const id = `${slugify(input.title)}-${Date.now().toString(36)}`;
+
+  const { error } = await supabase.from('books').insert({
+    id,
+    title: input.title,
+    author: input.author,
+    category: input.category,
+    cover_url: input.coverUrl || '',
+    total_pages: pages.length,
+    description: input.description || '',
+    quote: input.quote || null,
+    content: pages,
+    tags: input.tags || [],
+  });
+
+  if (error) {
+    console.error('Kitap kaydedilemedi:', error);
+    return { success: false };
+  }
+  return { success: true, pageCount: pages.length };
+};
+
+export const deleteBook = async (bookId: string): Promise<boolean> => {
+  const { error } = await supabase.from('books').delete().eq('id', bookId);
+  if (error) {
+    console.error('Kitap silinemedi:', error);
+    return false;
+  }
+  return true;
 };
 
 // --- SOSYAL: GÖNDERİLER ---

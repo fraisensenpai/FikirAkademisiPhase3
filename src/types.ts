@@ -1,6 +1,6 @@
-export type Screen = 'dashboard' | 'library' | 'reader' | 'teacher' | 'social' | 'profile' | 'login' | 'student-register' | 'teacher-register';
+export type Screen = 'dashboard' | 'library' | 'reader' | 'teacher' | 'manage' | 'social' | 'profile' | 'login' | 'student-register' | 'teacher-register' | 'developer-register';
 
-export type UserRole = 'student' | 'teacher';
+export type UserRole = 'student' | 'teacher' | 'developer';
 
 export interface Book {
   id: string;
@@ -12,13 +12,24 @@ export interface Book {
   description: string;
   chapterTitle?: string;
   chapterSubtitle?: string;
-  content?: string[];
   illustrationUrl?: string;
   quote?: string;
+  // Her eleman bir sayfanın tam metnidir (TXT yüklemesinde otomatik bölünür)
+  content?: string[];
   tags?: string[];
   // Kullanıcıya özel (reading_progress tablosundan birleştirilir)
   currentPage?: number;
   progressPercent?: number;
+}
+
+/** Öğrencinin belirli bir kitaptaki okuma durumu (öğretmen görünümü) */
+export interface StudentBookProgress {
+  bookId: string;
+  bookTitle: string;
+  lastPage: number;
+  totalPages: number;
+  progressPercent: number;
+  updatedAt: string;
 }
 
 export interface Note {
@@ -40,6 +51,8 @@ export interface StudentProgress {
   status: 'Tamamladı' | 'Devam Ediyor' | 'Başlamadı';
   pagesRead: number;
   lastActive: string;
+  /** Kitap bazında okuma detayı (öğretmen "hangi sayfada kaldı" görür) */
+  bookProgress?: StudentBookProgress[];
 }
 
 export interface Assignment {

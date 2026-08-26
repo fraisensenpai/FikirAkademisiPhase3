@@ -20,9 +20,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 
   const navItems = [
     {
-      id: userRole === 'teacher' ? 'teacher' : 'dashboard',
-      label: 'Dashboard',
-      icon: LayoutGrid,
+      id: userRole === 'teacher' ? 'teacher' : userRole === 'developer' ? 'manage' : 'dashboard',
+      label: userRole === 'teacher' ? 'Panel' : userRole === 'developer' ? 'Kitaplar' : 'Dashboard',
+      icon: userRole === 'developer' ? BookDown : LayoutGrid,
     },
     {
       id: 'library',

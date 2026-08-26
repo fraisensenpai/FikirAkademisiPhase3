@@ -52,7 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Center: Brand Title */}
         <div className="text-center">
           <h1 className="font-['Plus_Jakarta_Sans'] text-xl sm:text-2xl font-bold text-[#091426] tracking-tight">
-            {userRole === 'student' ? 'Fikir Akademisi' : 'Öğretmen Paneli'}
+            {userRole === 'student' ? 'Fikir Akademisi' : userRole === 'developer' ? 'Geliştirici Paneli' : 'Öğretmen Paneli'}
           </h1>
         </div>
 

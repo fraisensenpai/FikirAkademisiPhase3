@@ -9,6 +9,7 @@ import { TeacherDashboard } from './components/TeacherDashboard';
 import { SocialView } from './components/SocialView';
 import { ProfileView } from './components/ProfileView';
 import { AuthScreens } from './components/AuthScreens';
+import { BookManagementView } from './components/BookManagementView';
 import { useAuth } from './contexts/AuthContext';
 import {
   fetchBooks,
@@ -127,7 +128,7 @@ export default function App() {
   };
 
   const handleLoginSuccess = (role: UserRole) => {
-    setCurrentScreen(role === 'student' ? 'dashboard' : 'teacher');
+    setCurrentScreen(role === 'student' ? 'dashboard' : role === 'developer' ? 'manage' : 'teacher');
   };
 
   // Auth Guard
@@ -135,7 +136,13 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#f7f9fb]">
         <AuthScreens
-          currentScreen={currentScreen === 'student-register' || currentScreen === 'teacher-register' ? currentScreen : 'login'}
+          currentScreen={
+            currentScreen === 'student-register' ||
+            currentScreen === 'teacher-register' ||
+            currentScreen === 'developer-register'
+              ? currentScreen
+              : 'login'
+          }
           onNavigate={(screen) => setCurrentScreen(screen)}
           onLoginSuccess={handleLoginSuccess}
         />
@@ -160,6 +167,14 @@ export default function App() {
             books={books}
             onSelectBook={handleSelectBook}
             onNavigateToLibrary={() => setCurrentScreen('library')}
+          />
+        )}
+
+        {(currentScreen === 'manage' || (currentScreen === 'dashboard' && activeRole === 'developer')) && (
+          <BookManagementView
+            books={books}
+            onBookAdded={loadData}
+            onSelectBook={handleSelectBook}
           />
         )}
 
