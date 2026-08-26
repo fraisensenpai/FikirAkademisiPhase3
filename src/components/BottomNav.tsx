@@ -21,22 +21,22 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   const navItems = [
     {
       id: userRole === 'teacher' ? 'teacher' : userRole === 'developer' ? 'manage' : 'dashboard',
-      label: userRole === 'teacher' ? 'Panel' : userRole === 'developer' ? 'Kitaplar' : 'Dashboard',
+      label: userRole === 'teacher' ? 'Panelim' : userRole === 'developer' ? 'Kitaplar' : 'Ana Sayfa',
       icon: userRole === 'developer' ? BookDown : LayoutGrid,
     },
     {
       id: 'library',
-      label: 'Library',
+      label: 'Kütüphane',
       icon: BookDown,
     },
     {
       id: 'social',
-      label: 'Social',
+      label: 'Sosyal',
       icon: BarChart2,
     },
     {
       id: 'profile',
-      label: 'Profile',
+      label: 'Profil',
       icon: User,
     },
   ];

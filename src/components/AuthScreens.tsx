@@ -6,15 +6,16 @@ import {
   Lock,
   User,
   ArrowRight,
-  School,
   Eye,
   EyeOff,
   GraduationCap,
   BadgeCheck,
-  Code2,
   KeyRound,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from './Toast';
+
+const SCHOOL_NAME = 'M. Emin Saraç Anadolu İmam Hatip Lisesi';
 
 interface AuthScreensProps {
   currentScreen: 'login' | 'student-register' | 'teacher-register' | 'developer-register';
@@ -28,6 +29,7 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
   onLoginSuccess,
 }) => {
   const { signIn, signUp } = useAuth();
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   
   // Login states
@@ -66,12 +68,14 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
     setLoading(true);
     const { error, role } = await signIn(loginEmail, loginPassword);
     if (error) {
-      alert(
+      showToast(
         error.message === 'Invalid login credentials'
           ? 'E-posta veya şifre hatalı.'
-          : error.message
+          : error.message,
+        'error'
       );
     } else {
+      showToast('Giriş başarılı, hoş geldin!', 'success');
       onLoginSuccess(role || 'student');
     }
     setLoading(false);
@@ -86,11 +90,14 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
       school_number: studentNumber,
     });
     if (error) {
-      alert(error.message.includes('already registered')
-        ? 'Bu e-posta ile bir hesap zaten mevcut.'
-        : error.message);
+      showToast(
+        error.message.includes('already registered')
+          ? 'Bu e-posta ile bir hesap zaten mevcut.'
+          : error.message,
+        'error'
+      );
     } else {
-      alert('Kayıt başarılı! Lütfen giriş yapın.');
+      showToast('Kayıt başarılı! Lütfen giriş yapın.', 'success');
       onNavigate('login');
     }
     setLoading(false);
@@ -103,11 +110,14 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
       full_name: `${teacherName} ${teacherSurname}`.trim(),
     });
     if (error) {
-      alert(error.message.includes('already registered')
-        ? 'Bu e-posta ile bir hesap zaten mevcut.'
-        : error.message);
+      showToast(
+        error.message.includes('already registered')
+          ? 'Bu e-posta ile bir hesap zaten mevcut.'
+          : error.message,
+        'error'
+      );
     } else {
-      alert('Kayıt başarılı! Lütfen giriş yapın.');
+      showToast('Kayıt başarılı! Lütfen giriş yapın.', 'success');
       onNavigate('login');
     }
     setLoading(false);
@@ -118,7 +128,7 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
 
     const expectedCode = import.meta.env.VITE_DEVELOPER_ACCESS_CODE as string | undefined;
     if (!expectedCode || devAccessCode !== expectedCode) {
-      alert('Geliştirici kodu hatalı. Kayıt yapılamaz.');
+      showToast('Geliştirici kodu hatalı. Kayıt yapılamaz.', 'error');
       return;
     }
 
@@ -127,11 +137,14 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
       full_name: `${devName} ${devSurname}`.trim(),
     });
     if (error) {
-      alert(error.message.includes('already registered')
-        ? 'Bu e-posta ile bir hesap zaten mevcut.'
-        : error.message);
+      showToast(
+        error.message.includes('already registered')
+          ? 'Bu e-posta ile bir hesap zaten mevcut.'
+          : error.message,
+        'error'
+      );
     } else {
-      alert('Geliştirici kaydı başarılı! Lütfen giriş yapın.');
+      showToast('Geliştirici kaydı başarılı! Lütfen giriş yapın.', 'success');
       onNavigate('login');
     }
     setLoading(false);
@@ -149,15 +162,16 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
               className="flex items-center gap-2 text-slate-600 hover:text-[#091426] transition-colors w-fit mb-6 group text-xs font-bold uppercase tracking-wider"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-              <span>Back to Login</span>
+              <span>Girişe Dön</span>
             </button>
 
             <div className="space-y-2 max-w-md">
               <h1 className="font-['Plus_Jakarta_Sans'] text-3xl md:text-4xl font-extrabold text-[#091426] tracking-tight">
                 Fikir Akademisi
               </h1>
+              <p className="text-sm font-semibold text-emerald-700">{SCHOOL_NAME}</p>
               <p className="text-sm text-slate-600 leading-relaxed">
-                Empowering educators with a structured, minimalist approach to academic excellence.
+                Öğretmenler için yapılandırılmış ve sade bir kitap okuma takip platformu.
               </p>
             </div>
           </div>
@@ -166,7 +180,7 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
           <div className="rounded-2xl overflow-hidden shadow-sm border border-slate-200 h-64 md:h-80 relative bg-white my-6">
             <img
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuDr5fRzyAwYFlSZnMavNCKQ6cSeItyioWnjBIcjJgPAlpY0ZAhvYG0Vw9mQbp5h2PyOzkYNWempq5jqgp3Q3hn7KK1jhingOixiHqu8hMV9bz920kZ8yDETjA-BKQgJV5j8Vp37nJLBZD_V05DckiPFqAe-JoAHYBjGT4nl4hAtHU1P_MEAov-MX2NXBg9akxO7dctbioPmylL9oE4Yw0V4AYjmvDKa5CHvjoUPSpZ8K5PbsqZK8z8BtQ"
-              alt="University library setting"
+              alt="Okul kütüphanesi"
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#091426]/85 via-[#091426]/30 to-transparent"></div>
@@ -174,11 +188,11 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
               <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center backdrop-blur-xs">
                 <GraduationCap className="w-5 h-5 text-[#6ffbbe]" />
               </div>
-              <p className="font-['Plus_Jakarta_Sans'] text-lg font-bold">Educator Portal</p>
+              <p className="font-['Plus_Jakarta_Sans'] text-lg font-bold">Öğretmen Paneli</p>
             </div>
           </div>
 
-          <p className="text-xs text-slate-400">© 2026 Fikir Akademisi. All rights reserved.</p>
+          <p className="text-xs text-slate-400">© 2026 {SCHOOL_NAME} • Fikir Akademisi</p>
         </div>
 
         {/* Right Section: Registration Form */}
@@ -186,16 +200,16 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
           <div className="w-full max-w-md space-y-6">
             <div className="text-left space-y-1">
               <h2 className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[#091426]">
-                Teacher Registration
+                Öğretmen Kaydı
               </h2>
               <p className="text-xs text-slate-500">
-                Enter your details to create your academic account.
+                Akademik hesabını oluşturmak için bilgilerini gir.
               </p>
             </div>
 
             <form onSubmit={handleTeacherRegister} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Name</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Ad</label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                   <input
@@ -203,14 +217,14 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
                     required
                     value={teacherName}
                     onChange={(e) => setTeacherName(e.target.value)}
-                    placeholder="John"
+                    placeholder="Adın"
                     className="w-full pl-9 pr-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Surname</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Soyad</label>
                 <div className="relative">
                   <BadgeCheck className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                   <input
@@ -218,14 +232,14 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
                     required
                     value={teacherSurname}
                     onChange={(e) => setTeacherSurname(e.target.value)}
-                    placeholder="Doe"
+                    placeholder="Soyadın"
                     className="w-full pl-9 pr-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">E-mail</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">E-posta</label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                   <input
@@ -233,19 +247,20 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
                     required
                     value={teacherEmail}
                     onChange={(e) => setTeacherEmail(e.target.value)}
-                    placeholder="john.doe@university.edu"
+                    placeholder="ornek@meb.k12.tr"
                     className="w-full pl-9 pr-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Password</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Şifre</label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                   <input
                     type="password"
                     required
+                    minLength={6}
                     value={teacherPassword}
                     onChange={(e) => setTeacherPassword(e.target.value)}
                     placeholder="••••••••"
@@ -256,20 +271,21 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
 
               <button
                 type="submit"
-                className="w-full mt-2 py-3 px-4 rounded-xl font-['Plus_Jakarta_Sans'] font-bold text-xs text-white bg-[#091426] hover:bg-[#1e293b] transition-all shadow-xs"
+                disabled={loading}
+                className="w-full mt-2 py-3 px-4 rounded-xl font-['Plus_Jakarta_Sans'] font-bold text-xs text-white bg-[#091426] hover:bg-[#1e293b] transition-all shadow-xs disabled:opacity-50"
               >
-                Register Account
+                Hesap Oluştur
               </button>
 
               <div className="text-center pt-2">
                 <p className="text-xs text-slate-500">
-                  Already have an account?{' '}
+                  Zaten hesabın var mı?{' '}
                   <button
                     type="button"
                     onClick={() => onNavigate('login')}
                     className="font-bold text-[#006c49] hover:underline"
                   >
-                    Sign In
+                    Giriş Yap
                   </button>
                 </p>
               </div>
@@ -292,18 +308,14 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
               className="self-start mb-4 text-slate-500 hover:text-[#091426] transition-colors flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider group"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-              <span>Back to Login</span>
+              <span>Girişe Dön</span>
             </button>
 
-            <div className="w-16 h-16 rounded-2xl bg-[#e6e8ea] flex items-center justify-center mb-4 shadow-xs">
-              <School className="w-8 h-8 text-[#091426]" />
-            </div>
-
             <h1 className="font-['Plus_Jakarta_Sans'] text-2xl sm:text-3xl font-extrabold text-[#091426] mb-1">
-              Student Registration
+              Öğrenci Kaydı
             </h1>
             <p className="text-xs text-slate-500 max-w-xs">
-              Create your Fikir Akademisi account to access your digital library and courses.
+              {SCHOOL_NAME} dijital kütüphanesine erişmek için hesabını oluştur.
             </p>
           </div>
 
@@ -313,27 +325,27 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">
-                    Name
+                    Ad
                   </label>
                   <input
                     type="text"
                     required
                     value={studentName}
                     onChange={(e) => setStudentName(e.target.value)}
-                    placeholder="John"
+                    placeholder="Adın"
                     className="w-full px-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none"
                   />
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">
-                    Surname
+                    Soyad
                   </label>
                   <input
                     type="text"
                     required
                     value={studentSurname}
                     onChange={(e) => setStudentSurname(e.target.value)}
-                    placeholder="Doe"
+                    placeholder="Soyadın"
                     className="w-full px-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none"
                   />
                 </div>
@@ -387,7 +399,7 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
 
               <div>
                 <label className="text-[11px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">
-                  E-mail
+                  E-posta
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -396,7 +408,7 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
                     required
                     value={studentEmail}
                     onChange={(e) => setStudentEmail(e.target.value)}
-                    placeholder="student@school.edu"
+                    placeholder="ornek@ornek.com"
                     className="w-full pl-9 pr-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none"
                   />
                 </div>
@@ -404,7 +416,7 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
 
               <div>
                 <label className="text-[11px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">
-                  Password
+                  Şifre
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -431,7 +443,7 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
                   type="submit"
                   className="w-full bg-[#091426] hover:bg-[#1e293b] text-white rounded-full py-3 px-6 font-['Plus_Jakarta_Sans'] font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-xs"
                 >
-                  <span>Register</span>
+                  <span>Kaydol</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -439,12 +451,12 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
 
             <div className="mt-5 text-center">
               <p className="text-xs text-slate-500">
-                Already have an account?{' '}
+                Zaten hesabın var mı?{' '}
                 <button
                   onClick={() => onNavigate('login')}
                   className="text-[#091426] font-bold hover:underline"
                 >
-                  Log in here
+                  Giriş Yap
                 </button>
               </p>
             </div>
@@ -460,9 +472,6 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
       <div className="min-h-screen bg-[#f7f9fb] flex items-center justify-center p-4 sm:p-6 antialiased">
         <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200/80 shadow-md overflow-hidden animate-in fade-in zoom-in-95">
           <div className="px-6 pt-10 pb-6 text-center border-b border-slate-100">
-            <div className="w-12 h-12 rounded-2xl bg-[#091426] text-white flex items-center justify-center mx-auto mb-3 shadow-xs">
-              <Code2 className="w-6 h-6 text-emerald-400" />
-            </div>
             <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold text-[#091426] mb-1">
               Geliştirici Kaydı
             </h1>
@@ -583,14 +592,12 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
       <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200/80 shadow-md overflow-hidden animate-in fade-in zoom-in-95">
         {/* Header / Branding */}
         <div className="px-6 pt-10 pb-6 text-center border-b border-slate-100">
-          <div className="w-12 h-12 rounded-2xl bg-[#091426] text-white flex items-center justify-center mx-auto mb-3 shadow-xs">
-            <School className="w-6 h-6 text-emerald-400" />
-          </div>
           <h1 className="font-['Plus_Jakarta_Sans'] text-2xl sm:text-3xl font-extrabold text-[#091426] mb-1">
             Fikir Akademisi
           </h1>
-          <p className="text-xs text-slate-500 font-medium">
-            Welcome back to your academic journey.
+          <p className="text-xs font-bold text-emerald-700 tracking-wide">{SCHOOL_NAME}</p>
+          <p className="text-[11px] text-slate-500 font-medium mt-1.5">
+            Okuma platformuna tekrar hoş geldin.
           </p>
         </div>
 
@@ -599,7 +606,7 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Email Address
+                E-posta Adresi
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -608,7 +615,7 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
                   required
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
-                  placeholder="student@fikir.edu"
+                  placeholder="ornek@ornek.com"
                   className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-[#091426] focus:outline-none transition-colors"
                 />
               </div>
@@ -616,7 +623,7 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
 
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Password
+                Şifre
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -634,11 +641,11 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
                   href="#forgot"
                   onClick={(e) => {
                     e.preventDefault();
-                    alert('Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.');
+                    showToast('Şifre sıfırlama özelliği yakında eklenecek. Öğretmenine haber ver.', 'info');
                   }}
                   className="text-[11px] font-semibold text-[#006c49] hover:underline"
                 >
-                  Forgot password?
+                  Şifremi unuttum
                 </a>
               </div>
             </div>
@@ -646,9 +653,10 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
             <div className="pt-2">
               <button
                 type="submit"
-                className="w-full flex justify-center py-3 px-4 rounded-xl font-['Plus_Jakarta_Sans'] font-bold text-xs text-white bg-[#091426] hover:bg-[#1e293b] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#091426] transition-all shadow-xs cursor-pointer"
+                disabled={loading}
+                className="w-full flex justify-center py-3 px-4 rounded-xl font-['Plus_Jakarta_Sans'] font-bold text-xs text-white bg-[#091426] hover:bg-[#1e293b] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#091426] transition-all shadow-xs cursor-pointer disabled:opacity-50"
               >
-                Sign In
+                {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
               </button>
             </div>
           </form>

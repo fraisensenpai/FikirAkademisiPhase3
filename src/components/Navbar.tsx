@@ -51,9 +51,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Center: Brand Title */}
         <div className="text-center">
-          <h1 className="font-['Plus_Jakarta_Sans'] text-xl sm:text-2xl font-bold text-[#091426] tracking-tight">
+          <h1 className="font-['Plus_Jakarta_Sans'] text-lg sm:text-xl font-bold text-[#091426] tracking-tight leading-tight">
             {userRole === 'student' ? 'Fikir Akademisi' : userRole === 'developer' ? 'Geliştirici Paneli' : 'Öğretmen Paneli'}
           </h1>
+          <p className="hidden sm:block text-[10px] font-semibold text-slate-400 tracking-wide -mt-0.5">
+            M. Emin Saraç Anadolu İmam Hatip Lisesi
+          </p>
         </div>
 
         {/* Right: Role Badge */}

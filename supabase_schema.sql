@@ -15,6 +15,10 @@ drop table if exists public.students cascade;
 drop table if exists public.books cascade;
 drop table if exists public.profiles cascade;
 
+-- Eski trigger ve fonksiyonu temizle (auth.users üzerinde kalıcıdır)
+drop trigger if exists on_auth_user_created on auth.users;
+drop function if exists public.handle_new_user();
+
 -- ============================================================
 -- 1. PROFILES (kullanıcı rolleri ve bilgileri)
 -- ============================================================

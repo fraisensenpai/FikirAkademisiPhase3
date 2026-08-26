@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Book, Post, Club } from '../types';
 import { MessageSquare, Heart, Share2, BookOpen, Send } from 'lucide-react';
 import { fetchPosts, createPost, togglePostLike, fetchClubs, toggleClubMembership } from '../lib/dataService';
+import { useToast } from './Toast';
 
 interface SocialViewProps {
   onSelectBook: (book: string) => void;
@@ -10,6 +11,7 @@ interface SocialViewProps {
 }
 
 export const SocialView: React.FC<SocialViewProps> = ({ onSelectBook, books, userId }) => {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'discussions' | 'clubs'>('discussions');
   const [newPostText, setNewPostText] = useState('');
   const [selectedPostBook, setSelectedPostBook] = useState<string>('');
@@ -203,7 +205,7 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSelectBook, books, use
                     <button
                       onClick={() => {
                         navigator.clipboard?.writeText(`${window.location.origin}/?post=${post.id}`);
-                        alert('Paylaşım bağlantısı panoya kopyalandı!');
+                        showToast('Paylaşım bağlantısı panoya kopyalandı!', 'success');
                       }}
                       className="hover:text-slate-800"
                     >

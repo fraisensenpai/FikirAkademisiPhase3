@@ -37,8 +37,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <h2 className="font-['Plus_Jakarta_Sans'] text-xl font-bold text-[#091426]">
           {userName || 'Kullanıcı'}
         </h2>
+        <p className="text-xs font-semibold text-emerald-700 mt-0.5">
+          M. Emin Saraç Anadolu İmam Hatip Lisesi
+        </p>
         <p className="text-xs font-semibold text-slate-500 mt-0.5">
-          {userRole === 'student' ? 'Öğrenci' : 'Öğretmen'}
+          {userRole === 'student' ? 'Öğrenci' : userRole === 'developer' ? 'Geliştirici' : 'Öğretmen'}
         </p>
       </div>
 

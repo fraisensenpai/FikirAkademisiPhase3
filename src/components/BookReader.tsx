@@ -184,7 +184,7 @@ export const BookReader: React.FC<BookReaderProps> = ({
         >
           <ArrowLeft className="w-5 h-5" />
           <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">
-            Library
+            Kitaplık
           </span>
         </button>
 
