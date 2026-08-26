@@ -11,11 +11,13 @@ import {
   EyeOff,
   GraduationCap,
   BadgeCheck,
+  Code2,
+  KeyRound,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface AuthScreensProps {
-  currentScreen: 'login' | 'student-register' | 'teacher-register';
+  currentScreen: 'login' | 'student-register' | 'teacher-register' | 'developer-register';
   onNavigate: (screen: Screen) => void;
   onLoginSuccess: (role: UserRole) => void;
 }
@@ -35,17 +37,29 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
   // Student register states
   const [studentName, setStudentName] = useState('');
   const [studentSurname, setStudentSurname] = useState('');
-  const [studentClass, setStudentClass] = useState('10');
+  const [studentGrade, setStudentGrade] = useState<'Hazırlık' | '9'>('Hazırlık');
+  const [studentSection, setStudentSection] = useState('A');
   const [studentNumber, setStudentNumber] = useState('');
   const [studentEmail, setStudentEmail] = useState('');
   const [studentPassword, setStudentPassword] = useState('');
   const [showStudentPassword, setShowStudentPassword] = useState(false);
+
+  // Sınıf değerini birleştir (örn: "Hazırlık A" veya "9-B")
+  const studentClass = studentGrade === 'Hazırlık' ? `Hazırlık ${studentSection}` : `9-${studentSection}`;
 
   // Teacher register states
   const [teacherName, setTeacherName] = useState('');
   const [teacherSurname, setTeacherSurname] = useState('');
   const [teacherEmail, setTeacherEmail] = useState('');
   const [teacherPassword, setTeacherPassword] = useState('');
+
+  // Developer register states
+  const [devName, setDevName] = useState('');
+  const [devSurname, setDevSurname] = useState('');
+  const [devEmail, setDevEmail] = useState('');
+  const [devPassword, setDevPassword] = useState('');
+  const [devAccessCode, setDevAccessCode] = useState('');
+  const [showDevPassword, setShowDevPassword] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,6 +108,30 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
         : error.message);
     } else {
       alert('Kayıt başarılı! Lütfen giriş yapın.');
+      onNavigate('login');
+    }
+    setLoading(false);
+  };
+
+  const handleDeveloperRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const expectedCode = import.meta.env.VITE_DEVELOPER_ACCESS_CODE as string | undefined;
+    if (!expectedCode || devAccessCode !== expectedCode) {
+      alert('Geliştirici kodu hatalı. Kayıt yapılamaz.');
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await signUp(devEmail, devPassword, 'developer', {
+      full_name: `${devName} ${devSurname}`.trim(),
+    });
+    if (error) {
+      alert(error.message.includes('already registered')
+        ? 'Bu e-posta ile bir hesap zaten mevcut.'
+        : error.message);
+    } else {
+      alert('Geliştirici kaydı başarılı! Lütfen giriş yapın.');
       onNavigate('login');
     }
     setLoading(false);
@@ -304,32 +342,47 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">
-                    Class (Sınıf)
+                    Kademe
                   </label>
                   <select
-                    value={studentClass}
-                    onChange={(e) => setStudentClass(e.target.value)}
+                    value={studentGrade}
+                    onChange={(e) => setStudentGrade(e.target.value as 'Hazırlık' | '9')}
                     className="w-full px-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none cursor-pointer"
                   >
-                    <option value="9">9th Grade</option>
-                    <option value="10">10th Grade</option>
-                    <option value="11">11th Grade</option>
-                    <option value="12">12th Grade</option>
+                    <option value="Hazırlık">Hazırlık</option>
+                    <option value="9">9. Sınıf</option>
                   </select>
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">
-                    School Number
+                    Şube
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={studentNumber}
-                    onChange={(e) => setStudentNumber(e.target.value)}
-                    placeholder="12345"
-                    className="w-full px-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none"
-                  />
+                  <select
+                    value={studentSection}
+                    onChange={(e) => setStudentSection(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none cursor-pointer"
+                  >
+                    {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">
+                  Okul Numarası
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={studentNumber}
+                  onChange={(e) => setStudentNumber(e.target.value)}
+                  placeholder="12345"
+                  className="w-full px-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none"
+                />
               </div>
 
               <div>
@@ -401,7 +454,130 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
     );
   }
 
-  // 3. LOGIN SCREEN (Default)
+  // 3. DEVELOPER REGISTRATION SCREEN
+  if (currentScreen === 'developer-register') {
+    return (
+      <div className="min-h-screen bg-[#f7f9fb] flex items-center justify-center p-4 sm:p-6 antialiased">
+        <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200/80 shadow-md overflow-hidden animate-in fade-in zoom-in-95">
+          <div className="px-6 pt-10 pb-6 text-center border-b border-slate-100">
+            <div className="w-12 h-12 rounded-2xl bg-[#091426] text-white flex items-center justify-center mx-auto mb-3 shadow-xs">
+              <Code2 className="w-6 h-6 text-emerald-400" />
+            </div>
+            <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold text-[#091426] mb-1">
+              Geliştirici Kaydı
+            </h1>
+            <p className="text-xs text-slate-500 font-medium">
+              Kitap yükleme yetkisine sahip geliştirici hesabı oluşturun.
+            </p>
+          </div>
+
+          <div className="p-6 sm:p-8">
+            <form onSubmit={handleDeveloperRegister} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ad</label>
+                  <input
+                    type="text"
+                    required
+                    value={devName}
+                    onChange={(e) => setDevName(e.target.value)}
+                    placeholder="Ad"
+                    className="w-full px-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Soyad</label>
+                  <input
+                    type="text"
+                    required
+                    value={devSurname}
+                    onChange={(e) => setDevSurname(e.target.value)}
+                    placeholder="Soyad"
+                    className="w-full px-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">E-posta</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="email"
+                    required
+                    value={devEmail}
+                    onChange={(e) => setDevEmail(e.target.value)}
+                    placeholder="dev@fikirakademisi.com"
+                    className="w-full pl-9 pr-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Şifre</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type={showDevPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    value={devPassword}
+                    onChange={(e) => setDevPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-9 pr-10 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDevPassword(!showDevPassword)}
+                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                  >
+                    {showDevPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Geliştirici Kodu
+                </label>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type={showDevPassword ? 'text' : 'password'}
+                    required
+                    value={devAccessCode}
+                    onChange={(e) => setDevAccessCode(e.target.value)}
+                    placeholder="Gizli kod"
+                    className="w-full pl-9 pr-3 py-2.5 bg-[#f7f9fb] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none tracking-widest"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 px-4 rounded-xl font-['Plus_Jakarta_Sans'] font-bold text-xs text-white bg-[#091426] hover:bg-[#1e293b] transition-all shadow-xs disabled:opacity-50"
+              >
+                Geliştirici Hesabı Oluştur
+              </button>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('login')}
+                  className="text-xs text-slate-500 hover:text-[#091426] font-semibold"
+                >
+                  Zaten hesabın var mı? Giriş yap
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. LOGIN SCREEN (Default)
   return (
     <div className="min-h-screen bg-[#f7f9fb] flex items-center justify-center p-4 sm:p-6 antialiased">
       <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200/80 shadow-md overflow-hidden animate-in fade-in zoom-in-95">
@@ -480,21 +656,27 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
           {/* Registration Options */}
           <div className="mt-6 pt-4 border-t border-slate-100 text-center space-y-2">
             <p className="text-xs text-slate-500">
-              New to the academy?{' '}
+              Yeni mısın?{' '}
               <button
                 onClick={() => onNavigate('student-register')}
                 className="font-['Plus_Jakarta_Sans'] font-bold text-[#006c49] hover:underline"
               >
-                Student Register
+                Öğrenci Kaydı
               </button>
               {' • '}
               <button
                 onClick={() => onNavigate('teacher-register')}
                 className="font-['Plus_Jakarta_Sans'] font-bold text-[#091426] hover:underline"
               >
-                Teacher Register
+                Öğretmen Kaydı
               </button>
             </p>
+            <button
+              onClick={() => onNavigate('developer-register')}
+              className="text-[11px] text-slate-400 hover:text-slate-600 font-semibold"
+            >
+              Geliştirici Kaydı (Kitap Yükleme)
+            </button>
           </div>
         </div>
       </div>
