@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { Book, Note, StudentProgress, StudentBookProgress, Assignment, Post, Club } from '../types';
+import type { Book, Note, StudentProgress, StudentBookProgress, Assignment, Post } from '../types';
 import { splitTextIntoPages } from './textSplitter';
 
 // --- SATIR EŞLEME (snake_case -> camelCase) ---
@@ -24,6 +24,7 @@ interface ProgressRow {
   user_id: string;
   book_id: string;
   last_page: number;
+  seconds_read: number | null;
   updated_at: string;
 }
 
@@ -141,16 +142,32 @@ export const fetchBookById = async (id: string, userId?: string): Promise<Book |
 
 // --- OKUMA İLERLEMESİ ---
 
+/**
+ * Sayfa ilerlemesini kaydeder. additionalSeconds varsa aktif okuma süresine
+ * eklenir (hile denetimi için biriken sürenin flush'ı).
+ */
 export const saveReadingProgress = async (
   userId: string,
   bookId: string,
-  page: number
+  page: number,
+  additionalSeconds: number = 0
 ): Promise<boolean> => {
+  let currentSeconds = 0;
+  if (additionalSeconds > 0) {
+    const { data } = await supabase
+      .from('reading_progress')
+      .select('seconds_read')
+      .match({ user_id: userId, book_id: bookId })
+      .maybeSingle();
+    currentSeconds = data?.seconds_read || 0;
+  }
+
   const { error } = await supabase.from('reading_progress').upsert(
     {
       user_id: userId,
       book_id: bookId,
       last_page: page,
+      seconds_read: currentSeconds + additionalSeconds,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'user_id,book_id' }
@@ -158,6 +175,38 @@ export const saveReadingProgress = async (
 
   if (error) {
     console.error('İlerleme kaydedilemedi:', error);
+    return false;
+  }
+  return true;
+};
+
+/** Sadece aktif okuma süresini ekler (sayfa değiştirmeden) */
+export const addReadingSeconds = async (
+  userId: string,
+  bookId: string,
+  seconds: number
+): Promise<boolean> => {
+  if (seconds <= 0) return true;
+
+  const { data } = await supabase
+    .from('reading_progress')
+    .select('last_page, seconds_read')
+    .match({ user_id: userId, book_id: bookId })
+    .maybeSingle();
+
+  const { error } = await supabase.from('reading_progress').upsert(
+    {
+      user_id: userId,
+      book_id: bookId,
+      last_page: data?.last_page || 0,
+      seconds_read: (data?.seconds_read || 0) + seconds,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,book_id' }
+  );
+
+  if (error) {
+    console.error('Okuma süresi kaydedilemedi:', error);
     return false;
   }
   return true;
@@ -276,6 +325,7 @@ export const fetchStudentsWithProgress = async (): Promise<StudentProgress[]> =>
 
     const userRows = progressRows.filter((p) => p.user_id === profile.id);
     const pagesRead = userRows.reduce((sum, r) => sum + r.last_page, 0);
+    const readingSeconds = userRows.reduce((sum, r) => sum + (r.seconds_read || 0), 0);
 
     let overallPercent = 0;
     let hasCompleted = false;
@@ -293,10 +343,17 @@ export const fetchStudentsWithProgress = async (): Promise<StudentProgress[]> =>
           lastPage: r.last_page,
           totalPages: total,
           progressPercent: pct,
+          secondsRead: r.seconds_read || 0,
           updatedAt: timeAgo(r.updated_at),
         });
       }
     }
+
+    // Hile denetimi: gerçekçi üst sınır ~2 sayfa/dakika aktif okuma.
+    // Süre çok azken sayfa sayısı fazlaysa şüpheli işaretle.
+    const readingMinutes = readingSeconds / 60;
+    const suspicious =
+      readingMinutes < 1 ? pagesRead > 10 : pagesRead / readingMinutes > 2;
 
     // En son okunan kitap en üstte
     bookProgress.sort((a, b) => b.progressPercent - a.progressPercent);
@@ -318,6 +375,8 @@ export const fetchStudentsWithProgress = async (): Promise<StudentProgress[]> =>
       progressPercent: overallPercent,
       status,
       pagesRead,
+      readingSeconds,
+      suspicious,
       lastActive,
       bookProgress,
     };
@@ -416,6 +475,7 @@ export const fetchAssignments = async (): Promise<Assignment[]> => {
     progressPercent: 0,
     status: 'Başlamadı',
     pagesRead: 0,
+    readingSeconds: 0,
     lastActive: '',
   }));
 
@@ -604,48 +664,5 @@ export const togglePostLike = async (postId: string, userId: string, liked: bool
     return !error;
   }
   const { error } = await supabase.from('post_likes').insert({ post_id: postId, user_id: userId });
-  return !error;
-};
-
-// --- SOSYAL: KULÜPLER ---
-
-interface ClubRow {
-  id: string;
-  name: string;
-  description: string | null;
-  cover_url: string | null;
-  club_members: { user_id: string }[];
-}
-
-export const fetchClubs = async (currentUserId?: string): Promise<(Club & { joinedByMe: boolean })[]> => {
-  const { data, error } = await supabase
-    .from('clubs')
-    .select('*, club_members(user_id)');
-
-  if (error) {
-    console.error('Kulüpler çekilemedi:', error);
-    return [];
-  }
-
-  return (((data as unknown as ClubRow[]) || [])).map((row) => ({
-    id: row.id,
-    name: row.name,
-    description: row.description || '',
-    coverUrl: row.cover_url || '',
-    membersCount: row.club_members?.length || 0,
-    joinedByMe: currentUserId ? row.club_members?.some((m) => m.user_id === currentUserId) || false : false,
-  }));
-};
-
-export const toggleClubMembership = async (clubId: string, userId: string, joined: boolean): Promise<boolean> => {
-  if (joined) {
-    const { error } = await supabase
-      .from('club_members')
-      .delete()
-      .eq('club_id', clubId)
-      .eq('user_id', userId);
-    return !error;
-  }
-  const { error } = await supabase.from('club_members').insert({ club_id: clubId, user_id: userId });
   return !error;
 };

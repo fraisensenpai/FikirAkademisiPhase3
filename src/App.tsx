@@ -22,6 +22,7 @@ import {
   deleteNote,
   createAssignment,
   saveReadingProgress,
+  addReadingSeconds,
 } from './lib/dataService';
 
 export default function App() {
@@ -82,9 +83,9 @@ export default function App() {
     }
   };
 
-  const handleSaveProgress = async (bookId: string, page: number) => {
+  const handleSaveProgress = async (bookId: string, page: number, additionalSeconds: number = 0) => {
     if (!user) return;
-    const success = await saveReadingProgress(user.id, bookId, page);
+    const success = await saveReadingProgress(user.id, bookId, page, additionalSeconds);
     if (success) {
       setBooks((prev) =>
         prev.map((b) =>
@@ -98,6 +99,11 @@ export default function App() {
         )
       );
     }
+  };
+
+  const handleFlushReadingTime = async (bookId: string, seconds: number) => {
+    if (!user || seconds <= 0) return;
+    await addReadingSeconds(user.id, bookId, seconds);
   };
 
   const handleAddNote = async (newNoteData: Omit<Note, 'id' | 'createdAt'>) => {
@@ -194,6 +200,7 @@ export default function App() {
             onAddNote={handleAddNote}
             onDeleteNote={handleDeleteNote}
             onSaveProgress={handleSaveProgress}
+            onFlushReadingTime={handleFlushReadingTime}
           />
         )}
 

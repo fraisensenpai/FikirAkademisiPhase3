@@ -10,6 +10,8 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  Clock,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface TeacherDashboardProps {
@@ -25,6 +27,13 @@ interface TeacherDashboardProps {
   }) => Promise<boolean>;
   onSelectBook: (book: Book) => void;
 }
+
+const formatDuration = (seconds: number): string => {
+  if (seconds < 60) return `${seconds} sn`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  return h > 0 ? `${h} sa ${m} dk` : `${m} dk`;
+};
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   students,
@@ -290,6 +299,19 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       <span className="block text-[10px] text-slate-400">
                         {student.pagesRead} sayfa
                       </span>
+                      <span className="block text-[10px] text-slate-400 flex items-center justify-end gap-0.5 mt-0.5">
+                        <Clock className="w-3 h-3" />
+                        {formatDuration(student.readingSeconds)}
+                      </span>
+                      {student.suspicious && (
+                        <span
+                          className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-50 text-red-600 border border-red-200"
+                          title="Okuma süresi, okunan sayfa sayısıyla uyumsuz. Hile ihtimalini kontrol edin."
+                        >
+                          <AlertTriangle className="w-3 h-3" />
+                          Şüpheli
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -344,7 +366,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                 ></div>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-0.5">
-                                Son aktivite: {bp.updatedAt}
+                                Okuma süresi: {formatDuration(bp.secondsRead)} • Son aktivite: {bp.updatedAt}
                                 {bp.progressPercent >= 100
                                   ? ' • Tamamladı 🎉'
                                   : ` • ${bp.totalPages - bp.lastPage} sayfa kaldı`}

@@ -29,6 +29,7 @@ export interface StudentBookProgress {
   lastPage: number;
   totalPages: number;
   progressPercent: number;
+  secondsRead: number;
   updatedAt: string;
 }
 
@@ -50,7 +51,11 @@ export interface StudentProgress {
   progressPercent: number;
   status: 'Tamamladı' | 'Devam Ediyor' | 'Başlamadı';
   pagesRead: number;
+  /** Toplam aktif okuma süresi (saniye) */
+  readingSeconds: number;
   lastActive: string;
+  /** Sayfa/süre oranı imkansız derecede yüksekse true (hile şüphesi) */
+  suspicious?: boolean;
   /** Kitap bazında okuma detayı (öğretmen "hangi sayfada kaldı" görür) */
   bookProgress?: StudentBookProgress[];
 }
@@ -79,12 +84,4 @@ export interface Post {
   likedByMe: boolean;
   commentsCount: number;
   createdAt: string;
-}
-
-export interface Club {
-  id: string;
-  name: string;
-  description: string;
-  coverUrl: string;
-  membersCount: number;
 }

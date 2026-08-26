@@ -5,9 +5,9 @@
 
 -- Eski tabloları temizle
 drop table if exists public.post_likes cascade;
-drop table if exists public.club_members cascade;
 drop table if exists public.posts cascade;
 drop table if exists public.clubs cascade;
+drop table if exists public.club_members cascade;
 drop table if exists public.reading_progress cascade;
 drop table if exists public.assignments cascade;
 drop table if exists public.notes cascade;
@@ -98,6 +98,8 @@ create table public.reading_progress (
   user_id uuid not null references auth.users(id) on delete cascade,
   book_id text not null references public.books(id) on delete cascade,
   last_page integer not null default 0,
+  -- Aktif okuma süresi (saniye). Sekme görünürken sayılır -> "kitabı açık bırak" hilesine karşı
+  seconds_read integer not null default 0,
   updated_at timestamptz not null default now(),
   unique(user_id, book_id)
 );
@@ -125,7 +127,8 @@ create index assignments_class_idx on public.assignments(target_class);
 -- ============================================================
 create table public.posts (
   id uuid primary key default gen_random_uuid(),
-  author_id uuid not null references auth.users(id) on delete cascade,
+  -- profiles'e bağlı olmalı ki Supabase join'i (profiles(full_name)) çalışsın
+  author_id uuid not null references public.profiles(id) on delete cascade,
   book_id text references public.books(id) on delete set null,
   content text not null,
   created_at timestamptz not null default now()
@@ -138,25 +141,7 @@ create table public.post_likes (
 );
 
 -- ============================================================
--- 7. CLUBS + MEMBERS (okuma kulüpleri)
--- ============================================================
-create table public.clubs (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  description text default '',
-  cover_url text default '',
-  created_at timestamptz not null default now()
-);
-
-create table public.club_members (
-  club_id uuid not null references public.clubs(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  joined_at timestamptz not null default now(),
-  primary key (club_id, user_id)
-);
-
--- ============================================================
--- 8. ROW LEVEL SECURITY
+-- 7. ROW LEVEL SECURITY
 -- ============================================================
 alter table public.profiles enable row level security;
 alter table public.books enable row level security;
@@ -165,8 +150,6 @@ alter table public.reading_progress enable row level security;
 alter table public.assignments enable row level security;
 alter table public.posts enable row level security;
 alter table public.post_likes enable row level security;
-alter table public.clubs enable row level security;
-alter table public.club_members enable row level security;
 
 -- PROFILES: herkes görebilir (öğretmen listesi için), sadece kendini düzenleyebilir
 create policy "profiles_select" on public.profiles for select to authenticated using (true);
@@ -216,19 +199,3 @@ create policy "posts_delete_own" on public.posts for delete to authenticated usi
 create policy "likes_select" on public.post_likes for select to authenticated using (true);
 create policy "likes_insert_own" on public.post_likes for insert to authenticated with check (auth.uid() = user_id);
 create policy "likes_delete_own" on public.post_likes for delete to authenticated using (auth.uid() = user_id);
-
--- CLUBS: okunabilir, üyelik kendi
-create policy "clubs_select" on public.clubs for select to authenticated using (true);
-create policy "members_select" on public.club_members for select to authenticated using (true);
-create policy "members_insert_own" on public.club_members for insert to authenticated with check (auth.uid() = user_id);
-create policy "members_delete_own" on public.club_members for delete to authenticated using (auth.uid() = user_id);
-
--- ============================================================
--- 9. BAŞLANGIÇ VERİLERİ
--- (Kitaplar geliştirici panelinden TXT olarak yüklenir, seed yoktur)
--- ============================================================
-
--- Örnek kulüpler
-insert into public.clubs (name, description, cover_url) values
-('Klasik Felsefe Atölyesi', 'Platon ve Sokrates diyaloglarını haftalık tartışıyoruz.', 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=300&auto=format&fit=crop&q=80'),
-('Distopya & Gelecek Toplumları', 'Orwell, Huxley ve Bradbury eserlerini mercek altına alıyoruz.', 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=300&auto=format&fit=crop&q=80');

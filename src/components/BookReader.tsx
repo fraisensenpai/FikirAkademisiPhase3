@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Book, Note } from '../types';
 import { detectChapterTitle } from '../lib/textSplitter';
+import { useToast } from './Toast';
 import {
   ArrowLeft,
   Sliders,
@@ -29,8 +30,16 @@ interface BookReaderProps {
   notes: Note[];
   onAddNote: (note: Omit<Note, 'id' | 'createdAt'>) => void;
   onDeleteNote: (id: string) => void;
-  onSaveProgress: (bookId: string, page: number) => void;
+  /** Sayfa değişiminde çağrılır; additionalSeconds varsa okuma süresine eklenir */
+  onSaveProgress: (bookId: string, page: number, additionalSeconds?: number) => void;
+  /** Sayfa değiştirmeden biriken aktif okuma süresini (sn) DB'ye yazar */
+  onFlushReadingTime: (bookId: string, seconds: number) => void;
 }
+
+/** İleri sayfaya geçmek için aynı sayfada minimum kalınması gereken süre */
+const MIN_PAGE_SECONDS = 4;
+/** Biriken süreyi DB'ye yazma aralığı (saniye) */
+const FLUSH_INTERVAL_SECONDS = 20;
 
 export const BookReader: React.FC<BookReaderProps> = ({
   book,
@@ -39,6 +48,7 @@ export const BookReader: React.FC<BookReaderProps> = ({
   onAddNote,
   onDeleteNote,
   onSaveProgress,
+  onFlushReadingTime,
 }) => {
   const [currentPage, setCurrentPage] = useState(() => {
     if (book.currentPage && book.currentPage > 0) return Math.min(book.currentPage, book.totalPages || book.currentPage);
@@ -78,7 +88,56 @@ export const BookReader: React.FC<BookReaderProps> = ({
   const totalPages = Math.max(pages.length, book.totalPages || 0);
   const pageText = pages[currentPage - 1] || '';
 
+  // --- Hile denetimi: aktif okuma süresi takibi + hızlı sayfa çevirme engeli ---
+  const { showToast } = useToast();
+  const secondsRef = useRef(0);
+  const lastFlipAtRef = useRef(Date.now());
+  const currentPageRef = useRef(currentPage);
+  currentPageRef.current = currentPage;
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Sekme arka plandayken/görünür değilken süre işlemez ("açık bırakma" hilesine karşı)
+      if (document.visibilityState === 'visible') {
+        secondsRef.current += 1;
+        if (secondsRef.current >= FLUSH_INTERVAL_SECONDS) {
+          const s = secondsRef.current;
+          secondsRef.current = 0;
+          onFlushReadingTime(book.id, s);
+        }
+      }
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+      // Okuyucudan çıkarken kalan süreyi kaydet
+      if (secondsRef.current > 0) {
+        onFlushReadingTime(book.id, secondsRef.current);
+        secondsRef.current = 0;
+      }
+    };
+  }, [book.id]);
+
+  const flushPendingSeconds = () => {
+    if (secondsRef.current > 0) {
+      const s = secondsRef.current;
+      secondsRef.current = 0;
+      onSaveProgress(book.id, currentPageRef.current, s);
+    }
+  };
+
   const handlePageChange = (page: number) => {
+    const elapsed = (Date.now() - lastFlipAtRef.current) / 1000;
+
+    // İleri sayfaya çok hızlı geçiş engellenir (okumadan tarama hilesi)
+    if (page > currentPageRef.current && elapsed < MIN_PAGE_SECONDS) {
+      showToast('Sayfaları çok hızlı çeviriyorsun! Biraz okuyup öyle geç 🧐', 'error');
+      return;
+    }
+
+    lastFlipAtRef.current = Date.now();
+    flushPendingSeconds();
+
     const clamped = Math.max(1, Math.min(page, totalPages || page));
     setCurrentPage(clamped);
     onSaveProgress(book.id, clamped);
