@@ -6,21 +6,19 @@ export interface Book {
   id: string;
   title: string;
   author: string;
-  category: 'Klasikler' | 'Bilim' | 'Tarih' | 'Felsefe' | 'Psikoloji' | 'Edebiyat';
+  category: string;
   coverUrl: string;
   totalPages: number;
-  currentPage: number;
-  progressPercent: number;
   description: string;
   chapterTitle?: string;
   chapterSubtitle?: string;
   content?: string[];
   illustrationUrl?: string;
   quote?: string;
-  isAssigned?: boolean;
-  dueDate?: string;
-  statusBadge?: 'Devam Ediyor' | 'Yeni' | 'Tamamlandı';
   tags?: string[];
+  // Kullanıcıya özel (reading_progress tablosundan birleştirilir)
+  currentPage?: number;
+  progressPercent?: number;
 }
 
 export interface Note {
@@ -32,21 +30,10 @@ export interface Note {
   createdAt: string;
 }
 
-export interface Badge {
-  id: string;
-  title: string;
-  icon: string;
-  bgColor: string;
-  textColor: string;
-  earnedDate: string;
-  description: string;
-}
-
 export interface StudentProgress {
   id: string;
   name: string;
   surname: string;
-  avatarUrl: string;
   classGrade: string;
   schoolNumber: string;
   progressPercent: number;
@@ -62,8 +49,29 @@ export interface Assignment {
   bookAuthor: string;
   targetClass: string;
   dueDate: string;
-  assignedDate: string;
+  instructions?: string;
   totalStudents: number;
   completedStudents: number;
   avgProgress: number;
+}
+
+export interface Post {
+  id: string;
+  authorId: string;
+  authorName: string;
+  bookId: string | null;
+  bookTitle: string | null;
+  content: string;
+  likesCount: number;
+  likedByMe: boolean;
+  commentsCount: number;
+  createdAt: string;
+}
+
+export interface Club {
+  id: string;
+  name: string;
+  description: string;
+  coverUrl: string;
+  membersCount: number;
 }

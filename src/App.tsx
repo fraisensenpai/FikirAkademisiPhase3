@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Screen, UserRole, Book, Note, StudentProgress, Assignment } from './types';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
@@ -10,84 +10,123 @@ import { SocialView } from './components/SocialView';
 import { ProfileView } from './components/ProfileView';
 import { AuthScreens } from './components/AuthScreens';
 import { useAuth } from './contexts/AuthContext';
-import { fetchBooks, fetchNotes, fetchStudents, fetchAssignments, createNote, deleteNote, updateBookAssignmentStatus } from './lib/dataService';
+import {
+  fetchBooks,
+  fetchNotes,
+  fetchStudentsWithProgress,
+  fetchAssignments,
+  fetchClasses,
+  fetchBookById,
+  createNote,
+  deleteNote,
+  createAssignment,
+  saveReadingProgress,
+} from './lib/dataService';
 
 export default function App() {
-  const { user, loading, userRole, setUserRole } = useAuth();
+  const { user, loading, userRole, userName } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
-  
+
   const [books, setBooks] = useState<Book[]>([]);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [students, setStudents] = useState<StudentProgress[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [classes, setClasses] = useState<string[]>([]);
 
-  useEffect(() => {
-    console.log('App mounting, user:', user, 'loading:', loading);
-    if (user) {
-      loadData();
+  const loadData = useCallback(async () => {
+    if (!user) return;
+
+    const fetchedBooks = await fetchBooks(user.id);
+    setBooks(fetchedBooks);
+
+    const fetchedNotes = await fetchNotes(user.id);
+    setNotes(fetchedNotes);
+
+    if (userRole === 'teacher') {
+      const [fetchedStudents, fetchedAssignments, fetchedClasses] = await Promise.all([
+        fetchStudentsWithProgress(),
+        fetchAssignments(),
+        fetchClasses(),
+      ]);
+      setStudents(fetchedStudents);
+      setAssignments(fetchedAssignments);
+      setClasses(fetchedClasses);
     }
   }, [user, userRole]);
 
-  const loadData = async () => {
-    const fetchedBooks = await fetchBooks();
-    setBooks(fetchedBooks);
-    if (fetchedBooks.length > 0 && !selectedBook) setSelectedBook(fetchedBooks[0]);
-    
+  useEffect(() => {
     if (user) {
-      const fetchedNotes = await fetchNotes(user.id);
-      setNotes(fetchedNotes);
+      loadData();
     }
+  }, [user, userRole, loadData]);
 
-    if (userRole === 'teacher') {
-      const fetchedStudents = await fetchStudents();
-      setStudents(fetchedStudents);
-      const fetchedAssignments = await fetchAssignments();
-      setAssignments(fetchedAssignments);
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Yükleniyor...</div>;
+  }
+
+  const handleSelectBook = async (book: Book | string) => {
+    if (!user) return;
+    let fullBook: Book | null;
+    if (typeof book === 'string') {
+      fullBook = await fetchBookById(book, user.id);
+    } else {
+      // Okuyucu açılırken güncel ilerlemeyi de getir
+      fullBook = await fetchBookById(book.id, user.id);
+    }
+    if (fullBook) {
+      setSelectedBook(fullBook);
+      setCurrentScreen('reader');
+      window.scrollTo({ top: 0 });
     }
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
-  // Helper to open reader with chosen book
-  const handleSelectBook = (book: Book) => {
-    setSelectedBook(book);
-    setCurrentScreen('reader');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const handleSaveProgress = async (bookId: string, page: number) => {
+    if (!user) return;
+    const success = await saveReadingProgress(user.id, bookId, page);
+    if (success) {
+      setBooks((prev) =>
+        prev.map((b) =>
+          b.id === bookId
+            ? {
+                ...b,
+                currentPage: page,
+                progressPercent: Math.min(100, Math.round((page / (b.totalPages || 1)) * 100)),
+              }
+            : b
+        )
+      );
+    }
   };
 
   const handleAddNote = async (newNoteData: Omit<Note, 'id' | 'createdAt'>) => {
     if (!user) return;
     const newNote = await createNote({ ...newNoteData, user_id: user.id });
     if (newNote) {
-      setNotes([newNote, ...notes]);
+      setNotes((prev) => [newNote, ...prev]);
     }
   };
 
   const handleDeleteNote = async (id: string) => {
     const success = await deleteNote(id);
     if (success) {
-      setNotes(notes.filter((n) => n.id !== id));
+      setNotes((prev) => prev.filter((n) => n.id !== id));
     }
   };
 
-  const handleAssignHomework = async (newAssignment: any) => {
-    setAssignments([newAssignment, ...assignments]);
-    await updateBookAssignmentStatus(newAssignment.bookId, true, newAssignment.dueDate);
-    
-    setBooks(
-      books.map((b) =>
-        b.id === newAssignment.bookId
-          ? { ...b, isAssigned: true, dueDate: newAssignment.dueDate, statusBadge: 'Yeni' }
-          : b
-      )
-    );
+  const handleCreateHomework = async (
+    input: { bookId: string; targetClass: string; dueDate: string; instructions: string }
+  ): Promise<boolean> => {
+    if (!user) return false;
+    const success = await createAssignment({ ...input, createdBy: user.id });
+    if (success) {
+      const refreshed = await fetchAssignments();
+      setAssignments(refreshed);
+    }
+    return success;
   };
 
   const handleLoginSuccess = (role: UserRole) => {
-    setUserRole(role);
     setCurrentScreen(role === 'student' ? 'dashboard' : 'teacher');
   };
 
@@ -104,26 +143,21 @@ export default function App() {
     );
   }
 
-  const activeRole = userRole || 'student';
-  const activeBook = selectedBook || (books.length > 0 ? books[0] : null);
-  const badges: any[] = []; // Replacing mockBadges
+  const activeRole: UserRole = userRole || 'student';
 
   return (
     <div className="min-h-screen bg-[#f7f9fb] text-[#191c1e] flex flex-col antialiased selection:bg-[#6cf8bb] selection:text-[#002113]">
-      {/* Top Navbar (hidden in Reader mode) */}
       <Navbar
         currentScreen={currentScreen}
         setCurrentScreen={setCurrentScreen}
         userRole={activeRole}
-        setUserRole={setUserRole}
+        userName={userName || ''}
       />
 
-      {/* Screen Views */}
       <div className="flex-1">
-        {currentScreen === 'dashboard' && (
+        {currentScreen === 'dashboard' && activeRole === 'student' && (
           <StudentDashboard
             books={books}
-            badges={badges}
             onSelectBook={handleSelectBook}
             onNavigateToLibrary={() => setCurrentScreen('library')}
           />
@@ -132,32 +166,35 @@ export default function App() {
         {currentScreen === 'library' && (
           <LibraryView
             books={books}
+            assignments={activeRole === 'student' ? assignments : []}
             onSelectBook={handleSelectBook}
           />
         )}
 
-        {currentScreen === 'reader' && activeBook && (
+        {currentScreen === 'reader' && selectedBook && (
           <BookReader
-            book={activeBook}
+            book={selectedBook}
             onBack={() => setCurrentScreen('library')}
             notes={notes}
             onAddNote={handleAddNote}
             onDeleteNote={handleDeleteNote}
+            onSaveProgress={handleSaveProgress}
           />
         )}
 
-        {currentScreen === 'teacher' && userRole === 'teacher' ? (
+        {currentScreen === 'teacher' && activeRole === 'teacher' ? (
           <TeacherDashboard
             students={students}
             assignments={assignments}
             books={books}
-            onAssignHomework={handleAssignHomework}
+            classes={classes}
+            onCreateAssignment={handleCreateHomework}
             onSelectBook={handleSelectBook}
           />
         ) : currentScreen === 'teacher' ? (
           <div className="p-10 text-center">
             <p>Bu sayfaya erişim yetkiniz yok.</p>
-            <button 
+            <button
               onClick={() => setCurrentScreen('dashboard')}
               className="mt-4 text-emerald-600 font-bold underline"
             >
@@ -170,20 +207,19 @@ export default function App() {
           <SocialView
             onSelectBook={handleSelectBook}
             books={books}
+            userId={user.id}
           />
         )}
 
         {currentScreen === 'profile' && (
           <ProfileView
             userRole={activeRole}
-            setUserRole={setUserRole}
             setCurrentScreen={setCurrentScreen}
-            badges={badges}
+            books={books}
           />
         )}
       </div>
 
-      {/* Bottom Navigation Bar */}
       <BottomNav
         currentScreen={currentScreen}
         setCurrentScreen={setCurrentScreen}

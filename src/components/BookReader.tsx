@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Book, Note } from '../types';
 import {
   ArrowLeft,
@@ -28,6 +28,7 @@ interface BookReaderProps {
   notes: Note[];
   onAddNote: (note: Omit<Note, 'id' | 'createdAt'>) => void;
   onDeleteNote: (id: string) => void;
+  onSaveProgress: (bookId: string, page: number) => void;
 }
 
 export const BookReader: React.FC<BookReaderProps> = ({
@@ -36,8 +37,12 @@ export const BookReader: React.FC<BookReaderProps> = ({
   notes,
   onAddNote,
   onDeleteNote,
+  onSaveProgress,
 }) => {
-  const [currentPage, setCurrentPage] = useState(book.currentPage || 45);
+  const [currentPage, setCurrentPage] = useState(() => {
+    if (book.currentPage && book.currentPage > 0) return Math.min(book.currentPage, book.totalPages || book.currentPage);
+    return 1;
+  });
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showToc, setShowToc] = useState(false);
@@ -64,8 +69,36 @@ export const BookReader: React.FC<BookReaderProps> = ({
   ]);
   const [isAiLoading, setIsAiLoading] = useState(false);
 
-  const bookNotes = notes.filter((n) => n.bookId === book.id || n.bookId === 'arch-happiness');
+  const bookNotes = notes.filter((n) => n.bookId === book.id);
   const progressPercent = Math.min(100, Math.round((currentPage / (book.totalPages || 320)) * 100));
+
+  // İçindekiler: içeriği paragraf gruplarına bölerek oluştur
+  const chapters = useMemo(() => {
+    const content = book.content || [];
+    if (content.length === 0) {
+      return [{ title: book.chapterTitle || 'Bölüm 1', page: 1 }];
+    }
+    const chunkSize = 2;
+    const result: { title: string; page: number; startPara: number }[] = [];
+    for (let i = 0; i < content.length; i += chunkSize) {
+      const chapterIndex = Math.floor(i / chunkSize) + 1;
+      const approxPage = Math.max(1, Math.round((chapterIndex / Math.ceil(content.length / chunkSize)) * (book.totalPages || 100)));
+      result.push({
+        title: `${book.chapterTitle || 'Bölüm'} • Kısım ${chapterIndex}`,
+        page: Math.min(approxPage, book.totalPages || approxPage),
+        startPara: i,
+      });
+    }
+    return result;
+  }, [book]);
+
+  const [activeChapterStart, setActiveChapterStart] = useState(0);
+
+  const handlePageChange = (page: number) => {
+    const clamped = Math.max(1, Math.min(page, book.totalPages || page));
+    setCurrentPage(clamped);
+    onSaveProgress(book.id, clamped);
+  };
 
   const handleSaveNote = (e: React.FormEvent) => {
     e.preventDefault();
@@ -343,22 +376,16 @@ export const BookReader: React.FC<BookReaderProps> = ({
               </button>
             </div>
             <div className="space-y-2 max-h-80 overflow-y-auto">
-              {[
-                { title: 'Chapter 1: The Promise of Architecture', page: 1 },
-                { title: 'Chapter 2: In What Style Shall We Build?', page: 22 },
-                { title: 'Chapter 3: The Importance of Shelter (Aktif)', page: 45, current: true },
-                { title: 'Chapter 4: Ideals of Home and Harmony', page: 98 },
-                { title: 'Chapter 5: The Virtues of Buildings', page: 180 },
-                { title: 'Chapter 6: The Fields of Promise', page: 260 },
-              ].map((ch, idx) => (
+              {chapters.map((ch) => (
                 <button
-                  key={idx}
+                  key={ch.startPara}
                   onClick={() => {
-                    setCurrentPage(ch.page);
+                    setActiveChapterStart(ch.startPara);
+                    handlePageChange(ch.page);
                     setShowToc(false);
                   }}
                   className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-sm transition-colors ${
-                    ch.current
+                    activeChapterStart === ch.startPara
                       ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200'
                       : 'hover:bg-slate-50 text-slate-700'
                   }`}
@@ -414,25 +441,29 @@ export const BookReader: React.FC<BookReaderProps> = ({
             >
               {book.content && book.content.length > 0 ? (
                 <>
-                  <p className="indent-8">
-                    {book.content[0]}
-                  </p>
+                  {activeChapterStart > 0 && (
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      {book.chapterTitle || 'Bölüm'} • Kısım {Math.floor(activeChapterStart / 2) + 1}
+                    </p>
+                  )}
+                  {book.content
+                    .slice(activeChapterStart, activeChapterStart + 2)
+                    .map((para, i) => (
+                      <p key={i} className={i === 0 && activeChapterStart === 0 ? 'indent-8' : ''}>
+                        {para}
+                      </p>
+                    ))}
 
-                  {/* Architectural Sketch Image */}
-                  <div className="my-8 rounded-xl overflow-hidden bg-slate-100 border border-slate-200/80 shadow-xs relative">
-                    <img
-                      src={book.illustrationUrl || 'https://lh3.googleusercontent.com/aida-public/AB6AXuBglVOMgleMIld2tH1hCRCkr9UxXdyTy5gmcLxF6ovwbU0JhmQH-gH2XPjkCrRo8mClnDIQybdL_6R6xdVIGQ0EO2COIcF7ECN90oEqvHmBmiDTSexRDiNgVp-gVxjYZs7w_riwWH8GV1dzVXS9Bm6uXz92a33kqMxEJjKs6__02Zi4CVgWZc1O9v8w5KbYsD5g5vd2AreXbqLuWX_4teVtgYUvs94cWYl4HKXrg7Gxyfyt2Ba_1vdMRQ'}
-                      alt="Chapter visual illustration"
-                      className="w-full h-64 sm:h-80 object-cover opacity-95"
-                    />
-                    <div className="p-2.5 bg-white/90 backdrop-blur-xs text-[11px] text-slate-500 border-t border-slate-200 text-center italic">
-                      Şekil 3.1: Doğal ışık, yalın çizgiler ve zihinsel dinginliği pekiştiren mimari mekan eskizi.
+                  {/* Bölüm görseli */}
+                  {book.illustrationUrl && (
+                    <div className="my-8 rounded-xl overflow-hidden bg-slate-100 border border-slate-200/80 shadow-xs relative">
+                      <img
+                        src={book.illustrationUrl}
+                        alt={`${book.title} bölüm görseli`}
+                        className="w-full h-64 sm:h-80 object-cover opacity-95"
+                      />
                     </div>
-                  </div>
-
-                  {book.content.slice(1, 3).map((para, i) => (
-                    <p key={i}>{para}</p>
-                  ))}
+                  )}
 
                   {/* Styled Blockquote */}
                   {book.quote && (
@@ -441,24 +472,17 @@ export const BookReader: React.FC<BookReaderProps> = ({
                     </blockquote>
                   )}
 
-                  {book.content.slice(3, 4).map((para, i) => (
-                    <p key={i + 3}>{para}</p>
-                  ))}
-
-                  {/* Highlights Paragraph with interactive Click */}
-                  <p>
-                    The ultimate goal of architecture is not just to provide shelter from the elements, but to{' '}
-                    <mark
+                  {activeChapterStart === 0 && book.content.length > 2 && (
+                    <button
                       onClick={() => {
-                        setSelectedHighlightText('offer a sanctuary for the self.');
-                        setShowNotesSidebar(true);
+                        setActiveChapterStart(2);
+                        handlePageChange(Math.min(chapters[1]?.page || currentPage, book.totalPages || currentPage));
                       }}
-                      className="bg-[#6cf8bb]/60 text-[#005236] px-1.5 py-0.5 rounded-md cursor-pointer hover:bg-[#6cf8bb] transition-colors font-semibold border-b-2 border-emerald-600"
-                      title="Notu Görüntüle / Düzenle"
+                      className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
                     >
-                      offer a sanctuary for the self.
-                    </mark>
-                  </p>
+                      Devamını Oku <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
                 </>
               ) : (
                 <p>Kitap içeriği yükleniyor...</p>
@@ -468,7 +492,7 @@ export const BookReader: React.FC<BookReaderProps> = ({
             {/* End of chapter divider & Page switcher */}
             <div className="mt-12 pt-6 border-t border-slate-200/80 flex items-center justify-between">
               <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage <= 1}
                 className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition-colors"
               >
@@ -480,7 +504,7 @@ export const BookReader: React.FC<BookReaderProps> = ({
               </span>
 
               <button
-                onClick={() => setCurrentPage((p) => Math.min(book.totalPages || 320, p + 1))}
+                onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage >= (book.totalPages || 320)}
                 className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold bg-[#091426] text-white hover:bg-[#1e293b] transition-colors"
               >
@@ -601,7 +625,7 @@ export const BookReader: React.FC<BookReaderProps> = ({
                     Fikir AI • Okuma Asistanı
                   </h3>
                   <p className="text-[11px] text-slate-500 font-medium">
-                    {book.title} (Bölüm 3 Asistanı)
+                    {book.title} {book.chapterTitle ? `• ${book.chapterTitle}` : ''}
                   </p>
                 </div>
               </div>

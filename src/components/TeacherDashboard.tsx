@@ -7,11 +7,7 @@ import {
   Users,
   BookOpen,
   Calendar,
-  CheckCircle,
-  Clock,
-  AlertCircle,
   X,
-  Send,
   ChevronDown,
 } from 'lucide-react';
 
@@ -19,7 +15,13 @@ interface TeacherDashboardProps {
   students: StudentProgress[];
   assignments: Assignment[];
   books: Book[];
-  onAssignHomework: (newAssignment: any) => void;
+  classes: string[];
+  onCreateAssignment: (input: {
+    bookId: string;
+    targetClass: string;
+    dueDate: string;
+    instructions: string;
+  }) => Promise<boolean>;
   onSelectBook: (book: Book) => void;
 }
 
@@ -27,49 +29,82 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   students,
   assignments,
   books,
-  onAssignHomework,
-  onSelectBook,
+  classes,
+  onCreateAssignment,
 }) => {
   const [activeTab, setActiveTab] = useState<'analysis' | 'assignments'>('analysis');
-  const [selectedClass, setSelectedClass] = useState<string>('10-A Sınıfı');
+  const [selectedClass, setSelectedClass] = useState<string>(classes[0] || 'Tümü');
   const [statusFilter, setStatusFilter] = useState<string>('Tümü');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // New assignment form state
   const [newBookId, setNewBookId] = useState(books[0]?.id || '');
-  const [newDueDate, setNewDueDate] = useState('28 Kasım');
-  const [newInstructions, setNewInstructions] = useState('Bölüm 1 ve Bölüm 2 okunup özet çıkarılacak.');
+  const [newDueDate, setNewDueDate] = useState('');
+  const [newInstructions, setNewInstructions] = useState('');
+  const [formError, setFormError] = useState('');
 
-  const filteredStudents = students.filter((student) => {
+  // Sınıf değişince seçili sınıfı güncelle
+  React.useEffect(() => {
+    if (classes.length > 0 && !classes.includes(selectedClass)) {
+      setSelectedClass(classes[0]);
+    }
+  }, [classes]);
+
+  const classStudents = students.filter((s) =>
+    selectedClass === 'Tümü' ? true : s.classGrade === selectedClass
+  );
+
+  const filteredStudents = classStudents.filter((student) => {
     if (statusFilter === 'Tümü') return true;
     return student.status === statusFilter;
   });
 
-  const handleCreateAssignment = (e: React.FormEvent) => {
+  // Gerçek istatistikler
+  const completionRate =
+    classStudents.length > 0
+      ? Math.round(
+          (classStudents.filter((s) => s.status === 'Tamamladı').length / classStudents.length) * 100
+        )
+      : 0;
+
+  const activeAssignments = assignments.filter(
+    (a) => selectedClass === 'Tümü' || a.targetClass === selectedClass
+  );
+
+  const totalPagesRead = classStudents.reduce((sum, s) => sum + s.pagesRead, 0);
+
+  const handleCreateAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
-    const selectedBookObj = books.find((b) => b.id === newBookId);
-    if (!selectedBookObj) return;
+    setFormError('');
 
-    onAssignHomework({
-      id: 'asg-' + Date.now(),
-      bookId: selectedBookObj.id,
-      bookTitle: selectedBookObj.title,
-      bookAuthor: selectedBookObj.author,
-      targetClass: selectedClass.split(' ')[0],
+    if (!newBookId || !newDueDate || !selectedClass) {
+      setFormError('Lütfen tüm alanları doldurun.');
+      return;
+    }
+
+    setSubmitting(true);
+    const success = await onCreateAssignment({
+      bookId: newBookId,
+      targetClass: selectedClass,
       dueDate: newDueDate,
-      assignedDate: 'Bugün',
-      totalStudents: 32,
-      completedStudents: 0,
-      avgProgress: 0,
+      instructions: newInstructions,
     });
+    setSubmitting(false);
 
-    setShowAssignModal(false);
+    if (success) {
+      setShowAssignModal(false);
+      setNewDueDate('');
+      setNewInstructions('');
+    } else {
+      setFormError('Ödev kaydedilemedi. Tekrar deneyin.');
+    }
   };
 
   return (
     <div className="max-w-md mx-auto px-4 pt-4 pb-28 space-y-5 animate-in fade-in duration-300">
-      {/* Top Tabs: Sınıf Analizi / Ödev Takibi */}
+      {/* Top Tabs */}
       <div className="bg-[#eceef0] p-1 rounded-xl grid grid-cols-2 gap-1 text-center font-['Plus_Jakarta_Sans'] font-semibold text-sm">
         <button
           onClick={() => setActiveTab('analysis')}
@@ -100,47 +135,48 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           onChange={(e) => setSelectedClass(e.target.value)}
           className="w-full bg-white border border-[#e0e3e5] rounded-xl py-3 px-4 text-sm font-bold text-[#091426] focus:outline-none focus:ring-2 focus:ring-[#091426] appearance-none shadow-2xs cursor-pointer"
         >
-          <option value="10-A Sınıfı">10-A Sınıfı (32 Öğrenci)</option>
-          <option value="10-B Sınıfı">10-B Sınıfı (28 Öğrenci)</option>
-          <option value="11-A Sınıfı">11-A Sınıfı (30 Öğrenci)</option>
-          <option value="9-C Sınıfı">9-C Sınıfı (34 Öğrenci)</option>
+          <option value="Tümü">Tüm Sınıflar</option>
+          {classes.map((cls) => (
+            <option key={cls} value={cls}>
+              {cls} Sınıfı ({students.filter((s) => s.classGrade === cls).length} Öğrenci)
+            </option>
+          ))}
         </select>
         <ChevronDown className="w-5 h-5 text-slate-500 absolute right-3.5 top-3.5 pointer-events-none" />
       </div>
 
       {activeTab === 'analysis' ? (
         <>
-          {/* Main Hero Card: Tamamlanma Oranı %78 */}
+          {/* Main Hero Card */}
           <div className="bg-[#091426] text-white rounded-3xl p-6 shadow-md relative overflow-hidden flex items-center justify-between">
             <div>
               <span className="text-xs font-medium text-slate-300 block mb-1">
                 Tamamlanma Oranı
               </span>
               <div className="text-4xl font-extrabold font-['Plus_Jakarta_Sans'] tracking-tight">
-                %78
+                %{completionRate}
               </div>
               <span className="text-[11px] text-emerald-400 font-semibold mt-1 block">
-                +12% geçen haftaya göre
+                {classStudents.length} öğrenci takip ediliyor
               </span>
             </div>
 
-            {/* Circular Trend Icon */}
             <div className="w-14 h-14 rounded-full bg-[#6cf8bb] text-[#002113] flex items-center justify-center shadow-md">
               <TrendingUp className="w-7 h-7 stroke-[2.5]" />
             </div>
           </div>
 
-          {/* 2 Sub-metric Cards: Aktif Ödevler & Okunan Sayfa */}
+          {/* 2 Sub-metric Cards */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white rounded-2xl p-4 border border-[#e6e8ea] shadow-xs">
               <span className="text-xs text-slate-500 font-medium block">
                 Aktif Ödevler
               </span>
               <span className="text-2xl font-bold font-['Plus_Jakarta_Sans'] text-[#091426] mt-1 block">
-                12
+                {activeAssignments.length}
               </span>
               <span className="text-[11px] text-slate-400 mt-1 block">
-                2 teslim yaklaşıyor
+                Toplam atanan ödev
               </span>
             </div>
 
@@ -149,10 +185,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 Okunan Sayfa
               </span>
               <span className="text-2xl font-bold font-['Plus_Jakarta_Sans'] text-[#091426] mt-1 block">
-                4.2k
+                {totalPagesRead}
               </span>
               <span className="text-[11px] text-slate-400 mt-1 block">
-                Bu ay toplam
+                Tüm zamanlar toplamı
               </span>
             </div>
           </div>
@@ -196,6 +232,18 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
             {/* Student Cards List */}
             <div className="space-y-3">
+              {filteredStudents.length === 0 && (
+                <div className="text-center py-8 bg-white rounded-2xl border border-slate-200 p-6">
+                  <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-slate-700">
+                    Bu sınıfta henüz kayıtlı öğrenci yok.
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Öğrenciler hesap oluşturunca burada listelenirler.
+                  </p>
+                </div>
+              )}
+
               {filteredStudents.map((student) => (
                 <div
                   key={student.id}
@@ -204,24 +252,16 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       {/* Avatar */}
-                      {student.avatarUrl ? (
-                        <img
-                          src={student.avatarUrl}
-                          alt={`${student.name} ${student.surname}`}
-                          className="w-11 h-11 rounded-full object-cover border border-slate-200"
-                        />
-                      ) : (
-                        <div className="w-11 h-11 rounded-full bg-[#1e293b] text-white flex items-center justify-center font-bold text-sm">
-                          {student.name[0]}
-                          {student.surname[0]}
-                        </div>
-                      )}
+                      <div className="w-11 h-11 rounded-full bg-[#1e293b] text-white flex items-center justify-center font-bold text-sm">
+                        {student.name[0]}
+                        {student.surname !== '-' ? student.surname[0] : ''}
+                      </div>
 
                       <div>
                         <h4 className="font-['Plus_Jakarta_Sans'] font-bold text-sm text-[#091426]">
                           {student.name} {student.surname}
                         </h4>
-                        <div className="mt-1">
+                        <div className="mt-1 flex items-center gap-1.5">
                           <span
                             className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
                               student.status === 'Tamamladı'
@@ -233,6 +273,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                           >
                             {student.status}
                           </span>
+                          {student.classGrade && (
+                            <span className="text-[10px] text-slate-400">{student.classGrade}</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -283,7 +326,15 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </div>
 
           <div className="space-y-3">
-            {assignments.map((asg) => (
+            {activeAssignments.length === 0 && (
+              <div className="text-center py-8 bg-white rounded-2xl border border-slate-200 p-6">
+                <BookOpen className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-700">Henüz ödev atanmadı.</p>
+                <p className="text-xs text-slate-400 mt-1">"Yeni Ödev Ata" butonuna tıklayın.</p>
+              </div>
+            )}
+
+            {activeAssignments.map((asg) => (
               <div
                 key={asg.id}
                 className="bg-white rounded-2xl p-4 border border-[#e6e8ea] shadow-xs space-y-3"
@@ -299,6 +350,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     {asg.targetClass}
                   </span>
                 </div>
+
+                {asg.instructions && (
+                  <p className="text-xs text-slate-600 bg-amber-50 border border-amber-100 rounded-lg p-2.5">
+                    📋 {asg.instructions}
+                  </p>
+                )}
 
                 <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl">
                   <div className="flex items-center gap-1.5">
@@ -345,12 +402,24 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <form onSubmit={handleCreateAssignment} className="space-y-4">
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Hedef Sınıf</label>
-                <input
-                  type="text"
-                  disabled
+                <select
                   value={selectedClass}
-                  className="w-full p-2.5 bg-slate-100 rounded-xl text-xs font-semibold text-slate-700 border border-slate-200"
-                />
+                  onChange={(e) => setSelectedClass(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 cursor-pointer"
+                  required
+                >
+                  <option value="">Sınıf seçin</option>
+                  {classes.map((cls) => (
+                    <option key={cls} value={cls}>
+                      {cls}
+                    </option>
+                  ))}
+                </select>
+                {classes.length === 0 && (
+                  <p className="text-[11px] text-red-500 mt-1">
+                    Henüz kayıtlı öğrenci yok. Öğrenciler kayıt olunca sınıf seçenekleri oluşur.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -359,6 +428,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   value={newBookId}
                   onChange={(e) => setNewBookId(e.target.value)}
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+                  required
                 >
                   {books.map((b) => (
                     <option key={b.id} value={b.id}>
@@ -371,10 +441,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Son Teslim Tarihi</label>
                 <input
-                  type="text"
+                  type="date"
                   value={newDueDate}
                   onChange={(e) => setNewDueDate(e.target.value)}
-                  placeholder="Örn: 28 Kasım"
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800"
                   required
                 />
@@ -386,9 +455,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   value={newInstructions}
                   onChange={(e) => setNewInstructions(e.target.value)}
                   rows={2}
+                  placeholder="Örn: Bölüm 1 ve Bölüm 2 okunup özet çıkarılacak."
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800"
                 ></textarea>
               </div>
+
+              {formError && (
+                <p className="text-xs text-red-600 font-semibold">{formError}</p>
+              )}
 
               <div className="flex justify-end gap-2 pt-2">
                 <button
@@ -400,9 +474,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#091426] text-white rounded-xl text-xs font-bold hover:bg-[#1e293b]"
+                  disabled={submitting}
+                  className="px-5 py-2 bg-[#091426] text-white rounded-xl text-xs font-bold hover:bg-[#1e293b] disabled:opacity-50"
                 >
-                  Ödevi Ata & Yayınla
+                  {submitting ? 'Kaydediliyor...' : 'Ödevi Ata & Yayınla'}
                 </button>
               </div>
             </form>

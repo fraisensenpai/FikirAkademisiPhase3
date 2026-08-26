@@ -50,13 +50,15 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await signIn(loginEmail, loginPassword);
+    const { error, role } = await signIn(loginEmail, loginPassword);
     if (error) {
-      alert(error.message);
+      alert(
+        error.message === 'Invalid login credentials'
+          ? 'E-posta veya şifre hatalı.'
+          : error.message
+      );
     } else {
-      // Role logic will be handled by AuthContext onAuthStateChange or navigation
-      // For now, assume student for simplicity or fetch role from metadata
-      onLoginSuccess('student');
+      onLoginSuccess(role || 'student');
     }
     setLoading(false);
   };
@@ -64,9 +66,15 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
   const handleStudentRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await signUp(studentEmail, studentPassword, 'student', { name: studentName });
+    const { error } = await signUp(studentEmail, studentPassword, 'student', {
+      full_name: `${studentName} ${studentSurname}`.trim(),
+      class_grade: studentClass,
+      school_number: studentNumber,
+    });
     if (error) {
-      alert(error.message);
+      alert(error.message.includes('already registered')
+        ? 'Bu e-posta ile bir hesap zaten mevcut.'
+        : error.message);
     } else {
       alert('Kayıt başarılı! Lütfen giriş yapın.');
       onNavigate('login');
@@ -77,9 +85,13 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
   const handleTeacherRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await signUp(teacherEmail, teacherPassword, 'teacher', { name: teacherName });
+    const { error } = await signUp(teacherEmail, teacherPassword, 'teacher', {
+      full_name: `${teacherName} ${teacherSurname}`.trim(),
+    });
     if (error) {
-      alert(error.message);
+      alert(error.message.includes('already registered')
+        ? 'Bu e-posta ile bir hesap zaten mevcut.'
+        : error.message);
     } else {
       alert('Kayıt başarılı! Lütfen giriş yapın.');
       onNavigate('login');

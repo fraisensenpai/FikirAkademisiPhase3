@@ -1,24 +1,27 @@
 import React, { useState, useMemo } from 'react';
-import { Book } from '../types';
-import { Search, Clock, BookOpen, ClipboardList, CheckCircle2 } from 'lucide-react';
+import { Book, Assignment } from '../types';
+import { Search, Clock, BookOpen, ClipboardList } from 'lucide-react';
 
 interface LibraryViewProps {
   books: Book[];
+  assignments: Assignment[];
   onSelectBook: (book: Book) => void;
 }
 
-export const LibraryView: React.FC<LibraryViewProps> = ({ books, onSelectBook }) => {
+export const LibraryView: React.FC<LibraryViewProps> = ({ books, assignments, onSelectBook }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Tümü');
 
-  const categories = ['Tümü', 'Klasikler', 'Bilim', 'Tarih', 'Felsefe'];
+  const categories = ['Tümü', 'Klasikler', 'Bilim', 'Tarih', 'Felsefe', 'Edebiyat'];
 
-  // Active homework assignments
+  // Aktif ödevler: assignments tablosundan, kitap ilerlemesiyle birleştirilir
   const assignedBooks = useMemo(() => {
-    return books.filter((b) => b.isAssigned);
-  }, [books]);
+    return assignments
+      .map((asg) => books.find((b) => b.id === asg.bookId))
+      .filter((b): b is Book => Boolean(b));
+  }, [assignments, books]);
 
-  // General library books filtered by category and search
+  // Genel kütüphane filtreleri
   const filteredLibraryBooks = useMemo(() => {
     return books.filter((book) => {
       const matchesSearch =
@@ -29,6 +32,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ books, onSelectBook })
       return matchesSearch && matchesCategory;
     });
   }, [books, searchQuery, selectedCategory]);
+
+  const getDueDateForBook = (bookId: string) =>
+    assignments.find((a) => a.bookId === bookId)?.dueDate;
 
   return (
     <div className="max-w-md mx-auto px-4 pt-4 pb-28 space-y-6 animate-in fade-in duration-300">
@@ -64,69 +70,87 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ books, onSelectBook })
         </div>
 
         <div className="space-y-3">
-          {assignedBooks.map((book) => (
-            <div
-              key={book.id}
-              onClick={() => onSelectBook(book)}
-              className="bg-white rounded-2xl p-3.5 border border-[#e6e8ea] shadow-xs hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer group flex gap-3.5 items-center"
-            >
-              {/* Book Cover Thumbnail */}
-              <div className="w-18 h-24 shrink-0 rounded-xl overflow-hidden shadow-sm border border-slate-200 bg-slate-50 flex items-center justify-center p-1 relative">
-                <img
-                  src={book.coverUrl}
-                  alt={book.title}
-                  className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-
-              {/* Info & Progress */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-base text-[#091426] leading-tight group-hover:text-emerald-700 transition-colors truncate">
-                      {book.title}
-                    </h3>
-                    <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
-                      {book.author}
-                    </p>
-                  </div>
-
-                  {/* Status Badge */}
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold shrink-0 ${
-                      book.statusBadge === 'Devam Ediyor'
-                        ? 'bg-[#6cf8bb] text-[#005236]'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {book.statusBadge || 'Ödev'}
-                  </span>
-                </div>
-
-                {/* Due date */}
-                <div className="flex items-center gap-1 text-xs text-red-600 font-semibold mt-2">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Son Teslim: {book.dueDate}</span>
-                </div>
-
-                {/* Progress bar */}
-                <div className="mt-2 space-y-1">
-                  <div className="flex justify-between text-[11px] font-semibold text-slate-500">
-                    <span>İlerleme</span>
-                    <span>%{book.progressPercent}</span>
-                  </div>
-                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        book.progressPercent > 0 ? 'bg-emerald-600' : 'bg-slate-300'
-                      }`}
-                      style={{ width: `${Math.max(book.progressPercent, 0)}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
+          {assignedBooks.length === 0 && (
+            <div className="text-center py-6 bg-white rounded-2xl border border-slate-200 p-5">
+              <ClipboardList className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-xs font-semibold text-slate-600">
+                Şu anda atanmış bir ödevin yok.
+              </p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Öğretmenin ödev atadığında burada görünecek.
+              </p>
             </div>
-          ))}
+          )}
+
+          {assignedBooks.map((book) => {
+            const dueDate = getDueDateForBook(book.id);
+            const progress = book.progressPercent || 0;
+            return (
+              <div
+                key={`${book.id}-assignment`}
+                onClick={() => onSelectBook(book)}
+                className="bg-white rounded-2xl p-3.5 border border-[#e6e8ea] shadow-xs hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer group flex gap-3.5 items-center"
+              >
+                {/* Book Cover Thumbnail */}
+                <div className="w-18 h-24 shrink-0 rounded-xl overflow-hidden shadow-sm border border-slate-200 bg-slate-50 flex items-center justify-center p-1 relative">
+                  <img
+                    src={book.coverUrl}
+                    alt={book.title}
+                    className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+
+                {/* Info & Progress */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-base text-[#091426] leading-tight group-hover:text-emerald-700 transition-colors truncate">
+                        {book.title}
+                      </h3>
+                      <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                        {book.author}
+                      </p>
+                    </div>
+
+                    {/* Status Badge */}
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold shrink-0 ${
+                        progress > 0
+                          ? 'bg-[#6cf8bb] text-[#005236]'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {progress >= 100 ? 'Tamamlandı' : progress > 0 ? 'Devam Ediyor' : 'Yeni'}
+                    </span>
+                  </div>
+
+                  {/* Due date */}
+                  {dueDate && (
+                    <div className="flex items-center gap-1 text-xs text-red-600 font-semibold mt-2">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Son Teslim: {dueDate}</span>
+                    </div>
+                  )}
+
+                  {/* Progress bar */}
+                  <div className="mt-2 space-y-1">
+                    <div className="flex justify-between text-[11px] font-semibold text-slate-500">
+                      <span>İlerleme</span>
+                      <span>%{progress}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          progress > 0 ? 'bg-emerald-600' : 'bg-slate-300'
+                        }`}
+                        style={{ width: `${Math.max(progress, 0)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -176,7 +200,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ books, onSelectBook })
                     className="w-full h-full object-cover"
                   />
                 </div>
-                {book.isAssigned && (
+                {assignments.some((a) => a.bookId === book.id) && (
                   <span className="absolute top-2 right-2 px-2 py-0.5 bg-emerald-700 text-white text-[10px] font-bold rounded-full shadow-xs">
                     Ödev
                   </span>

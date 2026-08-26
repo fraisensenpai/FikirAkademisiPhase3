@@ -7,11 +7,11 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   userRole: UserRole | null;
+  userName: string | null;
   loading: boolean;
-  signUp: (email: string, password: string, role: UserRole, metadata?: any) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, role: UserRole, metadata?: Record<string, any>) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: any; role?: UserRole }>;
   signOut: () => Promise<void>;
-  setUserRole: (role: UserRole) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,7 +20,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRoleState] = useState<UserRole | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const extractUserRole = (currentUser: User): UserRole => {
+    const role = currentUser.user_metadata?.role as UserRole;
+    return role === 'teacher' ? 'teacher' : 'student';
+  };
+
+  const extractUserName = (currentUser: User): string => {
+    const metadataName = currentUser.user_metadata?.full_name as string;
+    if (metadataName) return metadataName;
+    const email = currentUser.email || '';
+    return email.split('@')[0] || 'Kullanıcı';
+  };
 
   useEffect(() => {
     // Get initial session
@@ -28,9 +41,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        // Determine role from user metadata
-        const role = session.user.user_metadata?.role as UserRole || 'student';
-        setUserRoleState(role);
+        setUserRoleState(extractUserRole(session.user));
+        setUserName(extractUserName(session.user));
       }
       setLoading(false);
     });
@@ -40,10 +52,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        const role = session.user.user_metadata?.role as UserRole || 'student';
-        setUserRoleState(role);
+        setUserRoleState(extractUserRole(session.user));
+        setUserName(extractUserName(session.user));
       } else {
         setUserRoleState(null);
+        setUserName(null);
       }
       setLoading(false);
     });
@@ -66,11 +79,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    return { error };
+    const role: UserRole | undefined = data?.user
+      ? extractUserRole(data.user)
+      : undefined;
+    return { error, role };
   };
 
   const signOut = async () => {
@@ -80,12 +96,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUserRoleState(null);
   };
 
-  const setUserRole = (role: UserRole) => {
-    setUserRoleState(role);
-  };
-
   return (
-    <AuthContext.Provider value={{ user, session, userRole, loading, signUp, signIn, signOut, setUserRole }}>
+    <AuthContext.Provider value={{ user, session, userRole, userName, loading, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
