@@ -24,7 +24,12 @@ import {
   saveReadingProgress,
   addReadingSeconds,
   fetchMyProfile,
+  fetchAllReviews,
+  fetchAllTransferRequests,
+  reviewTransferRequest,
+  applyApprovedTransfer,
 } from './lib/dataService';
+import type { BookReview, BookTransferRequest } from './types';
 
 export default function App() {
   const { user, loading, userRole, userName } = useAuth();
@@ -37,6 +42,8 @@ export default function App() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [classes, setClasses] = useState<string[]>([]);
   const [myClassGrade, setMyClassGrade] = useState<string>('');
+  const [reviews, setReviews] = useState<BookReview[]>([]);
+  const [transferRequests, setTransferRequests] = useState<BookTransferRequest[]>([]);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -58,12 +65,16 @@ export default function App() {
     }
 
     if (userRole === 'teacher') {
-      const [fetchedStudents, fetchedClasses] = await Promise.all([
+      const [fetchedStudents, fetchedClasses, fetchedReviews, fetchedTransfers] = await Promise.all([
         fetchStudentsWithProgress(),
         fetchClasses(),
+        fetchAllReviews(),
+        fetchAllTransferRequests(),
       ]);
       setStudents(fetchedStudents);
       setClasses(fetchedClasses);
+      setReviews(fetchedReviews);
+      setTransferRequests(fetchedTransfers);
     }
   }, [user, userRole]);
 
@@ -141,6 +152,26 @@ export default function App() {
       setAssignments(refreshed);
     }
     return success;
+  };
+
+  const handleReviewTransfer = async (requestId: string, approved: boolean): Promise<boolean> => {
+    if (!user) return false;
+    const ok = await reviewTransferRequest(requestId, user.id, approved);
+    if (ok && approved) {
+      // Onaylanan talebin sayfalarını aktar
+      const req = transferRequests.find((r) => r.id === requestId);
+      if (req) {
+        await applyApprovedTransfer(req.userId, req.bookId, req.readPages);
+        // Kitap listesini yenile
+        const refreshedBooks = await fetchBooks(user.id);
+        setBooks(refreshedBooks);
+      }
+    }
+    if (ok) {
+      const refreshed = await fetchAllTransferRequests();
+      setTransferRequests(refreshed);
+    }
+    return ok;
   };
 
   const handleLoginSuccess = (role: UserRole) => {
@@ -222,7 +253,10 @@ export default function App() {
             assignments={assignments}
             books={books}
             classes={classes}
+            reviews={reviews}
+            transferRequests={transferRequests}
             onCreateAssignment={handleCreateHomework}
+            onReviewTransfer={handleReviewTransfer}
             onSelectBook={handleSelectBook}
           />
         ) : currentScreen === 'teacher' ? (

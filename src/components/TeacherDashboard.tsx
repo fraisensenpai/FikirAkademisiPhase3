@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StudentProgress, Assignment, Book } from '../types';
+import { StudentProgress, Assignment, Book, BookReview, BookTransferRequest } from '../types';
 import {
   TrendingUp,
   Filter,
@@ -12,6 +12,10 @@ import {
   ChevronUp,
   Clock,
   AlertTriangle,
+  Star,
+  CheckCircle2,
+  XCircle,
+  ArrowRightLeft,
 } from 'lucide-react';
 
 interface TeacherDashboardProps {
@@ -19,12 +23,15 @@ interface TeacherDashboardProps {
   assignments: Assignment[];
   books: Book[];
   classes: string[];
+  reviews: BookReview[];
+  transferRequests: BookTransferRequest[];
   onCreateAssignment: (input: {
     bookId: string;
     targetClass: string;
     dueDate: string;
     instructions: string;
   }) => Promise<boolean>;
+  onReviewTransfer: (requestId: string, approved: boolean) => Promise<boolean>;
   onSelectBook: (book: Book) => void;
 }
 
@@ -40,9 +47,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   assignments,
   books,
   classes,
+  reviews,
+  transferRequests,
   onCreateAssignment,
+  onReviewTransfer,
 }) => {
-  const [activeTab, setActiveTab] = useState<'analysis' | 'assignments'>('analysis');
+  const [activeTab, setActiveTab] = useState<'analysis' | 'assignments' | 'reviews' | 'transfers'>('analysis');
   const [selectedClass, setSelectedClass] = useState<string>(classes[0] || 'Tümü');
   const [statusFilter, setStatusFilter] = useState<string>('Tümü');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -116,7 +126,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   return (
     <div className="max-w-md mx-auto px-4 pt-4 pb-28 space-y-5 animate-in fade-in duration-300">
       {/* Top Tabs */}
-      <div className="bg-[#eceef0] p-1 rounded-xl grid grid-cols-2 gap-1 text-center font-['Plus_Jakarta_Sans'] font-semibold text-sm">
+      <div className="bg-[#eceef0] p-1 rounded-xl grid grid-cols-4 gap-1 text-center font-['Plus_Jakarta_Sans'] font-semibold text-[11px]">
         <button
           onClick={() => setActiveTab('analysis')}
           className={`py-2 rounded-lg transition-all ${
@@ -125,7 +135,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          Sınıf Analizi
+          Analiz
         </button>
         <button
           onClick={() => setActiveTab('assignments')}
@@ -135,7 +145,32 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          Ödev Takibi
+          Ödevler
+        </button>
+        <button
+          onClick={() => setActiveTab('reviews')}
+          className={`py-2 rounded-lg transition-all ${
+            activeTab === 'reviews'
+              ? 'bg-white text-[#091426] shadow-xs font-bold'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          Yorumlar
+        </button>
+        <button
+          onClick={() => setActiveTab('transfers')}
+          className={`py-2 rounded-lg transition-all relative ${
+            activeTab === 'transfers'
+              ? 'bg-white text-[#091426] shadow-xs font-bold'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          Talepler
+          {transferRequests.filter((r) => r.status === 'pending').length > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+              {transferRequests.filter((r) => r.status === 'pending').length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -156,7 +191,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         <ChevronDown className="w-5 h-5 text-slate-500 absolute right-3.5 top-3.5 pointer-events-none" />
       </div>
 
-      {activeTab === 'analysis' ? (
+      {activeTab === 'analysis' && (
         <>
           {/* Main Hero Card */}
           <div className="bg-[#091426] text-white rounded-3xl p-6 shadow-md relative overflow-hidden flex items-center justify-between">
@@ -396,7 +431,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             </div>
           </section>
         </>
-      ) : (
+      )}
+
+      {activeTab === 'assignments' && (
         /* Ödev Takibi Tab */
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -467,6 +504,159 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     ></div>
                   </div>
                 </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Yorumlar Tab */}
+      {activeTab === 'reviews' && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-['Plus_Jakarta_Sans'] text-lg font-bold text-[#091426]">
+              Kitap Yorumları
+            </h2>
+            <span className="text-xs text-slate-500 font-semibold">
+              {reviews.length} yorum
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {reviews.length === 0 && (
+              <div className="text-center py-8 bg-white rounded-2xl border border-slate-200 p-6">
+                <Star className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-700">Henüz yorum yapılmamış.</p>
+                <p className="text-xs text-slate-400 mt-1">Öğrenciler kitapları bitirince yorumları burada görünecek.</p>
+              </div>
+            )}
+
+            {reviews.map((rev) => (
+              <div
+                key={rev.id}
+                className="bg-white rounded-2xl p-4 border border-[#e6e8ea] shadow-xs space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#1e293b] text-white flex items-center justify-center font-bold text-sm">
+                      {rev.userName[0]}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-[#091426]">{rev.userName}</h4>
+                      <p className="text-[11px] text-slate-500">{rev.bookTitle}</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-slate-400">{rev.createdAt}</span>
+                </div>
+
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`w-4 h-4 ${star <= rev.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`}
+                    />
+                  ))}
+                </div>
+
+                {rev.reviewText && (
+                  <p className="text-xs text-slate-600 bg-slate-50 rounded-xl p-3">
+                    {rev.reviewText}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Talepler Tab */}
+      {activeTab === 'transfers' && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-['Plus_Jakarta_Sans'] text-lg font-bold text-[#091426]">
+              Aktarım Talepleri
+            </h2>
+            <span className="text-xs text-slate-500 font-semibold">
+              {transferRequests.filter((r) => r.status === 'pending').length} bekleyen
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {transferRequests.length === 0 && (
+              <div className="text-center py-8 bg-white rounded-2xl border border-slate-200 p-6">
+                <ArrowRightLeft className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-700">Henüz aktarım talebi yok.</p>
+                <p className="text-xs text-slate-400 mt-1">Öğrenciler kitap ilerlemelerini aktarmak için talep gönderecek.</p>
+              </div>
+            )}
+
+            {transferRequests.map((req) => (
+              <div
+                key={req.id}
+                className={`bg-white rounded-2xl p-4 border shadow-xs space-y-3 transition-all ${
+                  req.status === 'pending'
+                    ? 'border-amber-300 ring-1 ring-amber-100'
+                    : req.status === 'approved'
+                    ? 'border-emerald-200'
+                    : 'border-red-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#1e293b] text-white flex items-center justify-center font-bold text-sm">
+                      {req.userName[0]}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-[#091426]">{req.userName}</h4>
+                      <p className="text-[11px] text-slate-500">{req.bookTitle}</p>
+                    </div>
+                  </div>
+                  <span
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${
+                      req.status === 'pending'
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                        : req.status === 'approved'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-red-50 text-red-700 border border-red-200'
+                    }`}
+                  >
+                    {req.status === 'pending' ? 'Bekliyor' : req.status === 'approved' ? 'Onaylandı' : 'Reddedildi'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl">
+                  <div>
+                    <span className="text-slate-400">Okunan Sayfa:</span>
+                    <span className="font-bold ml-1">{req.readPages.length} / {req.totalPages}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Talep:</span>
+                    <span className="font-bold ml-1">{req.createdAt}</span>
+                  </div>
+                </div>
+
+                {req.status === 'pending' && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        await onReviewTransfer(req.id, true);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-[#006c49] hover:bg-[#005236] text-white rounded-xl text-xs font-bold transition-colors"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Onayla
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await onReviewTransfer(req.id, false);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 border border-red-200 text-red-600 rounded-xl text-xs font-bold hover:bg-red-50 transition-colors"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      Reddet
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

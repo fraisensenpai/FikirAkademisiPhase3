@@ -250,3 +250,61 @@ create policy "answers_select" on public.question_answers for select to authenti
   or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('teacher', 'developer'))
 );
 create policy "answers_insert_own" on public.question_answers for insert to authenticated with check (auth.uid() = user_id);
+
+-- ============================================================
+-- 8. BOOK_REVIEWS (kitap bitirme yorumları - sadece öğretmen görür)
+-- ============================================================
+create table public.book_reviews (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  book_id text not null references public.books(id) on delete cascade,
+  rating integer not null check (rating >= 1 and rating <= 5),
+  review_text text not null default '',
+  created_at timestamptz not null default now(),
+  unique(user_id, book_id)
+);
+
+create index reviews_book_idx on public.book_reviews(book_id);
+create index reviews_user_idx on public.book_reviews(user_id);
+
+alter table public.book_reviews enable row level security;
+
+-- Öğrenci kendi yorumunu yazabilir/güncelleyebilir; öğretmen hepsini okuyabilir
+create policy "reviews_select" on public.book_reviews for select to authenticated using (
+  auth.uid() = user_id
+  or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'teacher')
+);
+create policy "reviews_insert_own" on public.book_reviews for insert to authenticated with check (auth.uid() = user_id);
+create policy "reviews_update_own" on public.book_reviews for update to authenticated using (auth.uid() = user_id);
+
+-- ============================================================
+-- 9. BOOK_TRANSFER_REQUESTS (kitap aktarım talepleri)
+-- ============================================================
+create table public.book_transfer_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  book_id text not null references public.books(id) on delete cascade,
+  read_pages integer[] not null default '{}',
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  reviewed_by uuid references auth.users(id) on delete set null,
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index transfer_requests_user_idx on public.book_transfer_requests(user_id);
+create index transfer_requests_status_idx on public.book_transfer_requests(status);
+
+alter table public.book_transfer_requests enable row level security;
+
+-- Öğrenci kendi taleplerini görebilir/oluşturabilir; öğretmen hepsini görebilir/onaylayabilir
+create policy "transfer_select" on public.book_transfer_requests for select to authenticated using (
+  auth.uid() = user_id
+  or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'teacher')
+);
+create policy "transfer_insert_student" on public.book_transfer_requests for insert to authenticated with check (
+  auth.uid() = user_id
+  and exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'student')
+);
+create policy "transfer_update_teacher" on public.book_transfer_requests for update to authenticated using (
+  exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'teacher')
+);

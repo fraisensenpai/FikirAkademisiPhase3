@@ -103,3 +103,28 @@ export interface Post {
   commentsCount: number;
   createdAt: string;
 }
+
+/** Kitap bitirme yorumu (sadece öğretmen görebilir) */
+export interface BookReview {
+  id: string;
+  userId: string;
+  userName: string;
+  bookId: string;
+  bookTitle: string;
+  rating: number;
+  reviewText: string;
+  createdAt: string;
+}
+
+/** Kitap aktarım talebi */
+export interface BookTransferRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  bookId: string;
+  bookTitle: string;
+  readPages: number[];
+  totalPages: number;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}

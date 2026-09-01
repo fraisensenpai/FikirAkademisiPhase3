@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { Book, Note, StudentProgress, StudentBookProgress, Assignment, Post, BookQuestion, QuizOption } from '../types';
+import type { Book, Note, StudentProgress, StudentBookProgress, Assignment, Post, BookQuestion, QuizOption, BookReview, BookTransferRequest } from '../types';
 import { splitTextIntoPages } from './textSplitter';
 
 // --- SATIR EŞLEME (snake_case -> camelCase) ---
@@ -815,4 +815,213 @@ export const togglePostLike = async (postId: string, userId: string, liked: bool
   }
   const { error } = await supabase.from('post_likes').insert({ post_id: postId, user_id: userId });
   return !error;
+};
+
+// --- KİTAP YORUMLARI (bitirme yorumu - sadece öğretmen görür) ---
+
+interface ReviewRow {
+  id: string;
+  user_id: string;
+  book_id: string;
+  rating: number;
+  review_text: string;
+  created_at: string;
+  profiles: { full_name: string | null } | null;
+  books: { title: string | null } | null;
+}
+
+/** Kullanıcının belirli bir kitaba yorumu var mı */
+export const fetchMyReview = async (
+  userId: string,
+  bookId: string
+): Promise<{ rating: number; reviewText: string } | null> => {
+  const { data } = await supabase
+    .from('book_reviews')
+    .select('rating, review_text')
+    .eq('user_id', userId)
+    .eq('book_id', bookId)
+    .maybeSingle();
+
+  if (!data) return null;
+  return { rating: data.rating, reviewText: data.review_text };
+};
+
+/** Kitap bitirme yorumu kaydet */
+export const saveBookReview = async (
+  userId: string,
+  bookId: string,
+  rating: number,
+  reviewText: string
+): Promise<boolean> => {
+  const { error } = await supabase.from('book_reviews').upsert(
+    {
+      user_id: userId,
+      book_id: bookId,
+      rating,
+      review_text: reviewText,
+    },
+    { onConflict: 'user_id,book_id' }
+  );
+  if (error) {
+    console.error('Yorum kaydedilemedi:', error);
+    return false;
+  }
+  return true;
+};
+
+/** Öğretmen: tüm kitap yorumlarını getir */
+export const fetchAllReviews = async (): Promise<BookReview[]> => {
+  const { data, error } = await supabase
+    .from('book_reviews')
+    .select('*, profiles(full_name), books(title)')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Yorumlar çekilemedi:', error);
+    return [];
+  }
+
+  return ((data as unknown as ReviewRow[]) || []).map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    userName: row.profiles?.full_name || 'Öğrenci',
+    bookId: row.book_id,
+    bookTitle: row.books?.title || '',
+    rating: row.rating,
+    reviewText: row.review_text,
+    createdAt: timeAgo(row.created_at),
+  }));
+};
+
+// --- KİTAP AKTARIM TALEPLERİ ---
+
+interface TransferRow {
+  id: string;
+  user_id: string;
+  book_id: string;
+  read_pages: number[];
+  status: string;
+  created_at: string;
+  profiles: { full_name: string | null } | null;
+  books: { title: string | null; total_pages: number | null } | null;
+}
+
+/** Öğrenci: kitap aktarım talebi oluştur */
+export const createTransferRequest = async (
+  userId: string,
+  bookId: string,
+  readPages: number[]
+): Promise<boolean> => {
+  const { error } = await supabase.from('book_transfer_requests').insert({
+    user_id: userId,
+    book_id: bookId,
+    read_pages: readPages,
+  });
+  if (error) {
+    console.error('Talep oluşturulamadı:', error);
+    return false;
+  }
+  return true;
+};
+
+/** Kullanıcının belirli bir kitap için bekleyen/tamamlanmış talebi var mı */
+export const fetchMyTransferRequest = async (
+  userId: string,
+  bookId: string
+): Promise<BookTransferRequest | null> => {
+  const { data } = await supabase
+    .from('book_transfer_requests')
+    .select('*, profiles(full_name), books(title, total_pages)')
+    .eq('user_id', userId)
+    .eq('book_id', bookId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!data) return null;
+  const row = data as unknown as TransferRow;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    userName: row.profiles?.full_name || 'Öğrenci',
+    bookId: row.book_id,
+    bookTitle: row.books?.title || '',
+    readPages: row.read_pages || [],
+    totalPages: row.books?.total_pages || 0,
+    status: row.status as 'pending' | 'approved' | 'rejected',
+    createdAt: timeAgo(row.created_at),
+  };
+};
+
+/** Öğretmen: tüm aktarım taleplerini getir */
+export const fetchAllTransferRequests = async (): Promise<BookTransferRequest[]> => {
+  const { data, error } = await supabase
+    .from('book_transfer_requests')
+    .select('*, profiles(full_name), books(title, total_pages)')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Talepler çekilemedi:', error);
+    return [];
+  }
+
+  return ((data as unknown as TransferRow[]) || []).map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    userName: row.profiles?.full_name || 'Öğrenci',
+    bookId: row.book_id,
+    bookTitle: row.books?.title || '',
+    readPages: row.read_pages || [],
+    totalPages: row.books?.total_pages || 0,
+    status: row.status as 'pending' | 'approved' | 'rejected',
+    createdAt: timeAgo(row.created_at),
+  }));
+};
+
+/** Öğretmen: talebi onayla/reddet */
+export const reviewTransferRequest = async (
+  requestId: string,
+  teacherId: string,
+  approved: boolean
+): Promise<boolean> => {
+  const { error } = await supabase
+    .from('book_transfer_requests')
+    .update({
+      status: approved ? 'approved' : 'rejected',
+      reviewed_by: teacherId,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', requestId);
+
+  if (error) {
+    console.error('Talep güncellenemedi:', error);
+    return false;
+  }
+  return true;
+};
+
+/** Onaylanmış bir talebin sayfalarını reading_progress'e aktar */
+export const applyApprovedTransfer = async (
+  userId: string,
+  bookId: string,
+  readPages: number[]
+): Promise<boolean> => {
+  if (readPages.length === 0) return true;
+  const maxPage = Math.max(...readPages);
+
+  const { error } = await supabase.from('reading_progress').upsert(
+    {
+      user_id: userId,
+      book_id: bookId,
+      last_page: maxPage,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,book_id' }
+  );
+
+  if (error) {
+    console.error('İlerleme aktarılamadı:', error);
+    return false;
+  }
+  return true;
 };

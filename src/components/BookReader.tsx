@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Book, Note, BookQuestion, QuizOption } from '../types';
 import { detectChapterTitle } from '../lib/textSplitter';
-import { fetchQuestionsForBook, saveQuestionAnswer } from '../lib/dataService';
+import { fetchQuestionsForBook, saveQuestionAnswer, fetchMyReview, saveBookReview, createTransferRequest, fetchMyTransferRequest } from '../lib/dataService';
 import { useToast } from './Toast';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import {
@@ -24,6 +24,7 @@ import {
   HelpCircle,
   BookOpen,
   Send,
+  ArrowRightLeft,
 } from 'lucide-react';
 
 interface BookReaderProps {
@@ -63,6 +64,16 @@ export const BookReader: React.FC<BookReaderProps> = ({
   const [showToc, setShowToc] = useState(false);
   const [showNotesSidebar, setShowNotesSidebar] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
+
+  // Book completion review state
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [reviewSaved, setReviewSaved] = useState(false);
+
+  // Transfer request state
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferStatus, setTransferStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
 
   // Reader Preferences
   const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg' | 'xl'>('lg');
@@ -109,6 +120,20 @@ export const BookReader: React.FC<BookReaderProps> = ({
     fetchQuestionsForBook(book.id, userId).then((qs) => {
       if (mounted) setQuestions(qs);
     });
+    // Check if user already reviewed this book
+    fetchMyReview(userId, book.id).then((review) => {
+      if (mounted && review) {
+        setReviewRating(review.rating);
+        setReviewText(review.reviewText);
+        setReviewSaved(true);
+      }
+    });
+    // Check if there's a pending/approved transfer request for this book
+    fetchMyTransferRequest(userId, book.id).then((req) => {
+      if (mounted && req) {
+        setTransferStatus(req.status);
+      }
+    });
     return () => {
       mounted = false;
     };
@@ -152,6 +177,13 @@ export const BookReader: React.FC<BookReaderProps> = ({
     const clamped = Math.max(1, Math.min(page, totalPages || page));
     setCurrentPage(clamped);
     onSaveProgress(book.id, clamped);
+
+    // Kitap bitti mi kontrol et (son sayfaya ulaşıldığında)
+    if (clamped >= totalPages && totalPages > 0) {
+      if (!reviewSaved) {
+        setShowReviewModal(true);
+      }
+    }
   };
 
   const handlePageChange = (page: number) => {
@@ -362,6 +394,17 @@ export const BookReader: React.FC<BookReaderProps> = ({
             ) : (
               <Bookmark className="w-4 h-4 sm:w-5 sm:h-5" />
             )}
+          </button>
+
+          {/* Transfer Request Button */}
+          <button
+            onClick={() => setShowTransferModal(true)}
+            className={`p-2 rounded-full transition-colors ${
+              transferStatus === 'pending' ? 'text-amber-500 bg-amber-50' : 'text-slate-600 hover:bg-black/5'
+            }`}
+            title="Kitap Aktarımı İste"
+          >
+            <ArrowRightLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
           {/* Table of Contents Button */}
@@ -906,6 +949,131 @@ export const BookReader: React.FC<BookReaderProps> = ({
                 <Send className="w-4 h-4" />
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Book Completion Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 text-slate-800">
+            <div className="text-center space-y-1">
+              <p className="text-3xl">🎉</p>
+              <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#091426]">
+                Tebrikler! Kitabı Bitirdin!
+              </h3>
+              <p className="text-xs text-slate-500">
+                "{book.title}" kitabını tamamladın. Düşüncelerini paylaşır mısın?
+              </p>
+              <p className="text-[10px] text-slate-400 italic">Yorumun sadece öğretmenin tarafından görülecektir.</p>
+            </div>
+
+            {/* Star Rating */}
+            <div className="flex justify-center gap-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setReviewRating(star)}
+                  className={`text-2xl transition-transform ${star <= reviewRating ? 'scale-110' : 'opacity-30'}`}
+                >
+                  ★
+                </button>
+              ))}
+            </div>
+
+            <textarea
+              value={reviewText}
+              onChange={(e) => setReviewText(e.target.value)}
+              rows={4}
+              placeholder="Bu kitap hakkında ne düşündüğünü yaz..."
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[#091426] focus:outline-none resize-none"
+            />
+
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  if (reviewRating === 0) {
+                    showToast('Lütfen bir puan seç.', 'error');
+                    return;
+                  }
+                  const ok = await saveBookReview(userId, book.id, reviewRating, reviewText);
+                  if (ok) {
+                    setReviewSaved(true);
+                    setShowReviewModal(false);
+                    showToast('Yorumun kaydedildi! 🎉', 'success');
+                  } else {
+                    showToast('Yorum kaydedilemedi.', 'error');
+                  }
+                }}
+                className="flex-1 py-2.5 bg-[#006c49] hover:bg-[#005236] text-white rounded-xl text-xs font-bold transition-colors"
+              >
+                Kaydet
+              </button>
+              <button
+                onClick={() => setShowReviewModal(false)}
+                className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-colors"
+              >
+                Atla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Request Modal */}
+      {showTransferModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 text-slate-800">
+            <div className="text-center space-y-1">
+              <p className="text-3xl">📤</p>
+              <h3 className="font-['Plus_Jakarta_Sans'] font-bold text-lg text-[#091426]">
+                Kitap Aktarım Talebi
+              </h3>
+              <p className="text-xs text-slate-500">
+                Bu kitapta dışarıda okuduğun sayfaları öğretmenine bildir. Onaylayınca ilerlemen aktarılacak.
+              </p>
+            </div>
+
+            {transferStatus !== 'none' && (
+              <div className={`text-center py-3 rounded-xl text-xs font-bold ${
+                transferStatus === 'pending' ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                : transferStatus === 'approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : 'bg-red-50 text-red-700 border border-red-200'
+              }`}>
+                {transferStatus === 'pending' ? '⏳ Talebiniz öğretmen tarafından bekleniyor...'
+                 : transferStatus === 'approved' ? '✅ Talebiniz onaylandı!'
+                 : '❌ Talebiniz reddedildi.'}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              {transferStatus === 'none' && (
+                <button
+                  onClick={async () => {
+                    // Kitaptaki tüm okunan sayfaları aktar
+                    const readPages = Array.from({ length: currentPage }, (_, i) => i + 1);
+                    const ok = await createTransferRequest(userId, book.id, readPages);
+                    if (ok) {
+                      setTransferStatus('pending');
+                      setShowTransferModal(false);
+                      showToast('Aktarım talebin gönderildi! 📤', 'success');
+                    } else {
+                      showToast('Talep gönderilemedi.', 'error');
+                    }
+                  }}
+                  className="flex-1 py-2.5 bg-[#006c49] hover:bg-[#005236] text-white rounded-xl text-xs font-bold transition-colors"
+                >
+                  Talep Gönder ({currentPage} sayfa)
+                </button>
+              )}
+              <button
+                onClick={() => setShowTransferModal(false)}
+                className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-colors"
+              >
+                Kapat
+              </button>
+            </div>
           </div>
         </div>
       )}

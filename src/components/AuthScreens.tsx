@@ -97,8 +97,13 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
         'error'
       );
     } else {
-      showToast('Kayıt başarılı! Lütfen giriş yapın.', 'success');
-      onNavigate('login');
+      showToast('Kayıt başarılı! Otomatik giriş yapılıyor...', 'success');
+      const { error: loginError, role } = await signIn(studentEmail, studentPassword);
+      if (!loginError) {
+        onLoginSuccess(role || 'student');
+      } else {
+        onNavigate('login');
+      }
     }
     setLoading(false);
   };
@@ -117,8 +122,13 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
         'error'
       );
     } else {
-      showToast('Kayıt başarılı! Lütfen giriş yapın.', 'success');
-      onNavigate('login');
+      showToast('Kayıt başarılı! Otomatik giriş yapılıyor...', 'success');
+      const { error: loginError, role } = await signIn(teacherEmail, teacherPassword);
+      if (!loginError) {
+        onLoginSuccess(role || 'teacher');
+      } else {
+        onNavigate('login');
+      }
     }
     setLoading(false);
   };
@@ -144,8 +154,13 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
         'error'
       );
     } else {
-      showToast('Geliştirici kaydı başarılı! Lütfen giriş yapın.', 'success');
-      onNavigate('login');
+      showToast('Geliştirici kaydı başarılı! Otomatik giriş yapılıyor...', 'success');
+      const { error: loginError, role } = await signIn(devEmail, devPassword);
+      if (!loginError) {
+        onLoginSuccess(role || 'developer');
+      } else {
+        onNavigate('login');
+      }
     }
     setLoading(false);
   };
@@ -473,10 +488,10 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
         <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200/80 shadow-md overflow-hidden animate-in fade-in zoom-in-95">
           <div className="px-6 pt-10 pb-6 text-center border-b border-slate-100">
             <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-extrabold text-[#091426] mb-1">
-              Geliştirici Kaydı
+              Geliştirici Girişi
             </h1>
             <p className="text-xs text-slate-500 font-medium">
-              Kitap yükleme yetkisine sahip geliştirici hesabı oluşturun.
+              Kitap yükleme yetkisine sahip geliştirici hesabını oluşturun.
             </p>
           </div>
 
@@ -683,7 +698,7 @@ export const AuthScreens: React.FC<AuthScreensProps> = ({
               onClick={() => onNavigate('developer-register')}
               className="text-[11px] text-slate-400 hover:text-slate-600 font-semibold"
             >
-              Geliştirici Kaydı (Kitap Yükleme)
+              Geliştirici Girişi
             </button>
           </div>
         </div>
