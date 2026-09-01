@@ -217,49 +217,67 @@ export const BookReader: React.FC<BookReaderProps> = ({
     setSelectedHighlightText('');
   };
 
-  const handleAiAction = (promptType: 'summary' | 'concept' | 'quiz') => {
+  const callAiApi = async (chatMessages: Array<{ role: 'ai' | 'user'; text: string }>) => {
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+    const response = await fetch(`${backendUrl}/api/ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: chatMessages,
+        bookTitle: book.title,
+        pageText: pageText || '',
+      }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'AI yanıtı alınamadı.' }));
+      throw new Error(err.error || 'AI yanıtı alınamadı.');
+    }
+    return response.json();
+  };
+
+  const handleAiAction = async (promptType: 'summary' | 'concept' | 'quiz') => {
     setIsAiLoading(true);
     let userMsg = '';
-    let responseMsg = '';
 
     if (promptType === 'summary') {
       userMsg = 'Bu bölümün ana fikrini ve en önemli mesajını özetler misin?';
-      responseMsg = `📌 **${book.title} - Bölüm Özeti:**\nBu bölümde mekanların ve mimarinin yalnızca fiziksel bir korunak değil, aynı zamanda insan psikolojisinin bir uzantısı olduğu vurgulanıyor. İyi tasarlanmış, aydınlık ve ferah mekanlar zihinsel dinginliğimizi artırırken; insanın kendi iç dünyasını yansıtan alanlarda daha huzurlu hissettiği savunuluyor.`;
     } else if (promptType === 'concept') {
-      userMsg = '"Psikolojik Zırh (Psychological Armature)" kavramı ne anlama geliyor?';
-      responseMsg = `💡 **Kavram Analizi:**\nMetindeki "psychological armature" ifadesi, yaşadığımız mekanların duygusal durumumuzu destekleyen, kırılganlıklarımızı koruyan ve ideal benliğimizi ayakta tutan içsel bir iskelet görevi gördüğünü açıklar. Evimiz sadece soğuktan korumaz, ruhumuzu da dengeler.`;
+      userMsg = 'Bu sayfadaki önemli kavramları açıkla.';
     } else if (promptType === 'quiz') {
-      userMsg = 'Bölümü ne kadar anladığımı test etmek için bana 1 soru sor.';
-      responseMsg = `❓ **Anlama Sorusu:**\nYazara göre karanlık/dar bir koridor ile güneş alan bir avlu arasındaki fark insan zihninde hangi temel duyguları tetikler? (Cevabını buraya yazabilirsin!)`;
+      userMsg = 'Bu bölümü ne kadar anladığımı test etmek için bana bir soru sor.';
     }
 
-    setAiChatLog((prev) => [...prev, { role: 'user', text: userMsg }]);
+    const updatedLog = [...aiChatLog, { role: 'user' as const, text: userMsg }];
+    setAiChatLog(updatedLog);
 
-    setTimeout(() => {
-      setAiChatLog((prev) => [...prev, { role: 'ai', text: responseMsg }]);
+    try {
+      const { text } = await callAiApi(updatedLog);
+      setAiChatLog((prev) => [...prev, { role: 'ai', text }]);
+    } catch (err: any) {
+      setAiChatLog((prev) => [...prev, { role: 'ai', text: `⚠️ Hata: ${err.message}` }]);
+    } finally {
       setIsAiLoading(false);
-    }, 600);
+    }
   };
 
-  const handleSendAiMessage = (e: React.FormEvent) => {
+  const handleSendAiMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiQuery.trim()) return;
 
     const userText = aiQuery;
-    setAiChatLog((prev) => [...prev, { role: 'user', text: userText }]);
+    const updatedLog = [...aiChatLog, { role: 'user' as const, text: userText }];
+    setAiChatLog(updatedLog);
     setAiQuery('');
     setIsAiLoading(true);
 
-    setTimeout(() => {
-      setAiChatLog((prev) => [
-        ...prev,
-        {
-          role: 'ai',
-          text: `"${userText}" sorunuz için metindeki bağlam oldukça önemlidir. Yazar, mekan seçiminin bireyin zihinsel sağlığı üzerindeki doğrudan etkisini savunur.`,
-        },
-      ]);
+    try {
+      const { text } = await callAiApi(updatedLog);
+      setAiChatLog((prev) => [...prev, { role: 'ai', text }]);
+    } catch (err: any) {
+      setAiChatLog((prev) => [...prev, { role: 'ai', text: `⚠️ Hata: ${err.message}` }]);
+    } finally {
       setIsAiLoading(false);
-    }, 700);
+    }
   };
 
   // Dynamic Theme Styling
