@@ -59,20 +59,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </p>
         </div>
 
-        {/* Right: Role Badge */}
-        <div className="flex items-center">
-          <span
-            className={`px-3 py-1.5 rounded-full text-[11px] font-bold ${
-              userRole === 'teacher'
-                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                : userRole === 'developer'
-                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-            }`}
-          >
-            {userRole === 'teacher' ? 'Öğretmen' : userRole === 'developer' ? 'Geliştirici' : 'Öğrenci'}
-          </span>
-        </div>
+        {/* Right: empty for balance */}
+        <div className="w-10" />
       </div>
     </header>
   );

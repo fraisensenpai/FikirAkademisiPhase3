@@ -1,4 +1,4 @@
-export type Screen = 'dashboard' | 'library' | 'reader' | 'teacher' | 'manage' | 'social' | 'profile' | 'login' | 'student-register' | 'teacher-register' | 'developer-register';
+export type Screen = 'dashboard' | 'library' | 'reader' | 'teacher' | 'manage' | 'social' | 'profile' | 'login' | 'student-register' | 'teacher-register' | 'developer-register' | 'quiz-solve' | 'quiz-manage' | 'transfer-request';
 
 export type UserRole = 'student' | 'teacher' | 'developer';
 
@@ -127,4 +127,67 @@ export interface BookTransferRequest {
   totalPages: number;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
+}
+
+// --- QUIZ SYSTEM ---
+
+/** Quiz seti (öğretmen/developer oluşturur) */
+export interface QuizSet {
+  id: string;
+  title: string;
+  description: string;
+  createdBy: string;
+  creatorName: string;
+  createdAt: string;
+  questionCount: number;
+}
+
+/** Quiz sorusu */
+export interface QuizQuestion {
+  id: string;
+  quizSetId: string;
+  question: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  correctOption: QuizOption;
+}
+
+/** Quiz ödevi (öğretmen bir quiz setini sınıfa atar) */
+export interface QuizAssignment {
+  id: string;
+  quizSetId: string;
+  quizSetTitle: string;
+  targetClass: string;
+  dueDate: string;
+  createdBy: string;
+  createdAt: string;
+  totalStudents: number;
+  completedStudents: number;
+  averageScore: number;
+}
+
+/** Öğrencinin quiz çözümü */
+export interface QuizSubmission {
+  id: string;
+  quizAssignmentId: string;
+  quizSetTitle: string;
+  userId: string;
+  userName: string;
+  score: number;
+  total: number;
+  answers: { questionId: string; selectedOption: QuizOption; isCorrect: boolean }[];
+  completedAt: string;
+}
+
+/** Öğrenci tarafında quiz ataması görünümü */
+export interface QuizAssignmentView {
+  id: string;
+  quizSetId: string;
+  quizSetTitle: string;
+  dueDate: string;
+  questionCount: number;
+  submitted: boolean;
+  score?: number;
 }

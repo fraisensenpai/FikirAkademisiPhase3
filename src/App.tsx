@@ -10,6 +10,9 @@ import { SocialView } from './components/SocialView';
 import { ProfileView } from './components/ProfileView';
 import { AuthScreens } from './components/AuthScreens';
 import { BookManagementView } from './components/BookManagementView';
+import { QuizManager } from './components/QuizManager';
+import { QuizSolve } from './components/QuizSolve';
+import { BookTransferRequestScreen } from './components/BookTransferRequestScreen';
 import { useAuth } from './contexts/AuthContext';
 import {
   fetchBooks,
@@ -42,6 +45,7 @@ export default function App() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [classes, setClasses] = useState<string[]>([]);
   const [myClassGrade, setMyClassGrade] = useState<string>('');
+  const [classGrade, setClassGrade] = useState<string>('');
   const [reviews, setReviews] = useState<BookReview[]>([]);
   const [transferRequests, setTransferRequests] = useState<BookTransferRequest[]>([]);
 
@@ -62,6 +66,7 @@ export default function App() {
     if (userRole === 'student') {
       const profile = await fetchMyProfile(user.id);
       setMyClassGrade(profile?.classGrade || '');
+      setClassGrade(profile?.classGrade || '');
     }
 
     if (userRole === 'teacher') {
@@ -258,6 +263,7 @@ export default function App() {
             onCreateAssignment={handleCreateHomework}
             onReviewTransfer={handleReviewTransfer}
             onSelectBook={handleSelectBook}
+            onNavigateToQuiz={() => setCurrentScreen('quiz-manage')}
           />
         ) : currentScreen === 'teacher' ? (
           <div className="p-10 text-center">
@@ -286,6 +292,30 @@ export default function App() {
             books={books}
             onSelectBook={handleSelectBook}
             onNavigateToLibrary={() => setCurrentScreen('library')}
+          />
+        )}
+
+        {currentScreen === 'quiz-manage' && (activeRole === 'teacher' || activeRole === 'developer') && (
+          <QuizManager
+            userId={user.id}
+            userRole={activeRole as 'teacher' | 'developer'}
+            classes={classes}
+          />
+        )}
+
+        {currentScreen === 'quiz-solve' && activeRole === 'student' && (
+          <QuizSolve
+            userId={user.id}
+            classGrade={classGrade}
+            onBack={() => setCurrentScreen('dashboard')}
+          />
+        )}
+
+        {currentScreen === 'transfer-request' && activeRole === 'student' && (
+          <BookTransferRequestScreen
+            books={books}
+            userId={user.id}
+            onBack={() => setCurrentScreen('library')}
           />
         )}
       </div>

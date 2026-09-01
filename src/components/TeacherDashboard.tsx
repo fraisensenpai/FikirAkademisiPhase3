@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StudentProgress, Assignment, Book, BookReview, BookTransferRequest } from '../types';
+import { StudentProgress, Assignment, Book, BookReview, BookTransferRequest, QuizOption } from '../types';
 import {
   TrendingUp,
   Filter,
@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   XCircle,
   ArrowRightLeft,
+  FileQuestion,
 } from 'lucide-react';
 
 interface TeacherDashboardProps {
@@ -33,6 +34,7 @@ interface TeacherDashboardProps {
   }) => Promise<boolean>;
   onReviewTransfer: (requestId: string, approved: boolean) => Promise<boolean>;
   onSelectBook: (book: Book) => void;
+  onNavigateToQuiz: () => void;
 }
 
 const formatDuration = (seconds: number): string => {
@@ -51,6 +53,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   transferRequests,
   onCreateAssignment,
   onReviewTransfer,
+  onSelectBook: _onSelectBook,
+  onNavigateToQuiz,
 }) => {
   const [activeTab, setActiveTab] = useState<'analysis' | 'assignments' | 'reviews' | 'transfers'>('analysis');
   const [selectedClass, setSelectedClass] = useState<string>(classes[0] || 'Tümü');
@@ -173,6 +177,15 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           )}
         </button>
       </div>
+
+      {/* Quiz Manager Button */}
+      <button
+        onClick={onNavigateToQuiz}
+        className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-[#e6e8ea] rounded-2xl text-xs font-bold text-[#091426] hover:border-slate-300 shadow-xs transition-all"
+      >
+        <FileQuestion className="w-4 h-4 text-[#006c49]" />
+        Quiz Yönetimi
+      </button>
 
       {/* Class Selector Dropdown */}
       <div className="relative">

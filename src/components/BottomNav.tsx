@@ -1,6 +1,6 @@
 import React from 'react';
 import { Screen, UserRole } from '../types';
-import { LayoutGrid, BookDown, BarChart2, User } from 'lucide-react';
+import { LayoutGrid, BookDown, BarChart2, User, FileQuestion, ArrowRightLeft } from 'lucide-react';
 
 interface BottomNavProps {
   currentScreen: Screen;
@@ -18,10 +18,36 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     return null;
   }
 
-  const navItems = [
+  const navItems = userRole === 'student' ? [
     {
-      id: userRole === 'teacher' ? 'teacher' : userRole === 'developer' ? 'manage' : 'dashboard',
-      label: userRole === 'teacher' ? 'Panelim' : userRole === 'developer' ? 'Kitaplar' : 'Ana Sayfa',
+      id: 'dashboard',
+      label: 'Ana Sayfa',
+      icon: LayoutGrid,
+    },
+    {
+      id: 'library',
+      label: 'Kütüphane',
+      icon: BookDown,
+    },
+    {
+      id: 'quiz-solve',
+      label: 'Quizler',
+      icon: FileQuestion,
+    },
+    {
+      id: 'transfer-request',
+      label: 'Aktarım',
+      icon: ArrowRightLeft,
+    },
+    {
+      id: 'profile',
+      label: 'Profil',
+      icon: User,
+    },
+  ] : [
+    {
+      id: userRole === 'teacher' ? 'teacher' : 'manage',
+      label: userRole === 'teacher' ? 'Panelim' : 'Kitaplar',
       icon: userRole === 'developer' ? BookDown : LayoutGrid,
     },
     {

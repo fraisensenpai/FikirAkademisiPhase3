@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { Book, Note, StudentProgress, StudentBookProgress, Assignment, Post, BookQuestion, QuizOption, BookReview, BookTransferRequest } from '../types';
+import type { Book, Note, StudentProgress, StudentBookProgress, Assignment, Post, BookQuestion, QuizOption, BookReview, BookTransferRequest, QuizSet, QuizQuestion, QuizAssignment, QuizSubmission, QuizAssignmentView } from '../types';
 import { splitTextIntoPages } from './textSplitter';
 
 // --- SATIR EŞLEME (snake_case -> camelCase) ---
@@ -1024,4 +1024,291 @@ export const applyApprovedTransfer = async (
     return false;
   }
   return true;
+};
+
+// --- QUIZ SYSTEM ---
+
+/** Quiz seti oluştur (geliştirici veya öğretmen) */
+export const createQuizSet = async (
+  title: string,
+  description: string,
+  createdBy: string,
+  questions: { question: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: QuizOption }[]
+): Promise<string | null> => {
+  const { data, error } = await supabase
+    .from('quiz_sets')
+    .insert({ title, description, created_by: createdBy })
+    .select('id')
+    .single();
+
+  if (error || !data) {
+    console.error('Quiz seti oluşturulamadı:', error);
+    return null;
+  }
+
+  if (questions.length > 0) {
+    const { error: qError } = await supabase.from('quiz_questions').insert(
+      questions.map((q) => ({
+        quiz_set_id: data.id,
+        question: q.question,
+        option_a: q.optionA,
+        option_b: q.optionB,
+        option_c: q.optionC,
+        option_d: q.optionD,
+        correct_option: q.correctOption,
+      }))
+    );
+    if (qError) console.error('Quiz soruları kaydedilemedi:', qError);
+  }
+
+  return data.id;
+};
+
+/** Tüm quiz setlerini getir */
+export const fetchQuizSets = async (): Promise<QuizSet[]> => {
+  const { data, error } = await supabase
+    .from('quiz_sets')
+    .select('*, quiz_questions(id), profiles(full_name)')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Quiz setleri çekilemedi:', error);
+    return [];
+  }
+
+  return ((data as unknown as any[]) || []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description || '',
+    createdBy: row.created_by,
+    creatorName: row.profiles?.full_name || 'Kullanıcı',
+    createdAt: timeAgo(row.created_at),
+    questionCount: row.quiz_questions?.length || 0,
+  }));
+};
+
+/** Quiz setinin sorularını getir */
+export const fetchQuizQuestions = async (quizSetId: string): Promise<QuizQuestion[]> => {
+  const { data, error } = await supabase
+    .from('quiz_questions')
+    .select('*')
+    .eq('quiz_set_id', quizSetId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Quiz soruları çekilemedi:', error);
+    return [];
+  }
+
+  return ((data as unknown as any[]) || []).map((row) => ({
+    id: row.id,
+    quizSetId: row.quiz_set_id,
+    question: row.question,
+    optionA: row.option_a,
+    optionB: row.option_b,
+    optionC: row.option_c,
+    optionD: row.option_d,
+    correctOption: row.correct_option as QuizOption,
+  }));
+};
+
+/** Quiz setini sil */
+export const deleteQuizSet = async (quizSetId: string): Promise<boolean> => {
+  const { error } = await supabase.from('quiz_sets').delete().eq('id', quizSetId);
+  if (error) console.error('Quiz seti silinemedi:', error);
+  return !error;
+};
+
+/** Quiz ödevi ata (öğretmen) */
+export const createQuizAssignment = async (
+  quizSetId: string,
+  targetClass: string,
+  dueDate: string,
+  createdBy: string
+): Promise<boolean> => {
+  const { error } = await supabase.from('quiz_assignments').insert({
+    quiz_set_id: quizSetId,
+    target_class: targetClass,
+    due_date: dueDate,
+    created_by: createdBy,
+  });
+  if (error) {
+    console.error('Quiz ödevi oluşturulamadı:', error);
+    return false;
+  }
+  return true;
+};
+
+/** Öğretmen: tüm quiz ödevlerini getir */
+export const fetchQuizAssignments = async (): Promise<QuizAssignment[]> => {
+  const { data, error } = await supabase
+    .from('quiz_assignments')
+    .select('*, quiz_sets(title), profiles!quiz_assignments_created_by_fkey(full_name)')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Quiz ödevleri çekilemedi:', error);
+    return [];
+  }
+
+  const results: QuizAssignment[] = [];
+  for (const row of ((data as unknown as any[]) || [])) {
+    const { data: submissions } = await supabase
+      .from('quiz_submissions')
+      .select('score, total')
+      .eq('quiz_assignment_id', row.id);
+
+    const subs = (submissions as unknown as { score: number; total: number }[]) || [];
+    const avgScore = subs.length > 0 ? Math.round(subs.reduce((s, x) => s + (x.total > 0 ? (x.score / x.total) * 100 : 0), 0) / subs.length) : 0;
+
+    const { count: totalStudents } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'student')
+      .eq('class_grade', row.target_class);
+
+    results.push({
+      id: row.id,
+      quizSetId: row.quiz_set_id,
+      quizSetTitle: row.quiz_sets?.title || '',
+      targetClass: row.target_class,
+      dueDate: formatDate(row.due_date),
+      createdBy: row.created_by,
+      createdAt: timeAgo(row.created_at),
+      totalStudents: totalStudents || 0,
+      completedStudents: subs.length,
+      averageScore: avgScore,
+    });
+  }
+
+  return results;
+};
+
+/** Öğrenci: kendi sınıfına atanmış quiz ödevlerini getir */
+export const fetchMyQuizAssignments = async (
+  userId: string,
+  classGrade: string
+): Promise<QuizAssignmentView[]> => {
+  const { data, error } = await supabase
+    .from('quiz_assignments')
+    .select('id, quiz_set_id, due_date, quiz_sets(title, quiz_questions(id))')
+    .eq('target_class', classGrade)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Quiz ödevleri çekilemedi:', error);
+    return [];
+  }
+
+  const assignmentIds = ((data as unknown as any[]) || []).map((r) => r.id);
+  let submissions: { quiz_assignment_id: string; score: number; total: number }[] = [];
+  if (assignmentIds.length > 0) {
+    const { data: subData } = await supabase
+      .from('quiz_submissions')
+      .select('quiz_assignment_id, score, total')
+      .eq('user_id', userId)
+      .in('quiz_assignment_id', assignmentIds);
+    submissions = (subData as unknown as typeof submissions) || [];
+  }
+
+  const subMap = new Map(submissions.map((s) => [s.quiz_assignment_id, s]));
+
+  return ((data as unknown as any[]) || []).map((row) => {
+    const sub = subMap.get(row.id);
+    return {
+      id: row.id,
+      quizSetId: row.quiz_set_id,
+      quizSetTitle: row.quiz_sets?.title || '',
+      dueDate: formatDate(row.due_date),
+      questionCount: row.quiz_sets?.quiz_questions?.length || 0,
+      submitted: !!sub,
+      score: sub ? sub.score : undefined,
+    };
+  });
+};
+
+/** Öğrenci: quiz çöz ve kaydet */
+export const submitQuizAnswers = async (
+  quizAssignmentId: string,
+  userId: string,
+  answers: { questionId: string; selectedOption: QuizOption; isCorrect: boolean }[]
+): Promise<boolean> => {
+  const correctCount = answers.filter((a) => a.isCorrect).length;
+
+  const { data, error } = await supabase
+    .from('quiz_submissions')
+    .insert({
+      quiz_assignment_id: quizAssignmentId,
+      user_id: userId,
+      score: correctCount,
+      total: answers.length,
+    })
+    .select('id')
+    .single();
+
+  if (error || !data) {
+    console.error('Quiz çözümü kaydedilemedi:', error);
+    return false;
+  }
+
+  if (answers.length > 0) {
+    await supabase.from('quiz_answers').insert(
+      answers.map((a) => ({
+        submission_id: data.id,
+        question_id: a.questionId,
+        selected_option: a.selectedOption,
+        is_correct: a.isCorrect,
+      }))
+    );
+  }
+
+  return true;
+};
+
+/** Öğretmen: quiz ödevinin sonuçlarını getir */
+export const fetchQuizSubmissions = async (
+  quizAssignmentId: string
+): Promise<QuizSubmission[]> => {
+  const { data, error } = await supabase
+    .from('quiz_submissions')
+    .select('*, profiles(full_name), quiz_answers(question_id, selected_option, is_correct)')
+    .eq('quiz_assignment_id', quizAssignmentId)
+    .order('score', { ascending: false });
+
+  if (error) {
+    console.error('Quiz sonuçları çekilemedi:', error);
+    return [];
+  }
+
+  return ((data as unknown as any[]) || []).map((row) => ({
+    id: row.id,
+    quizAssignmentId: row.quiz_assignment_id,
+    quizSetTitle: '',
+    userId: row.user_id,
+    userName: row.profiles?.full_name || 'Öğrenci',
+    score: row.score,
+    total: row.total,
+    answers: (row.quiz_answers || []).map((a: any) => ({
+      questionId: a.question_id,
+      selectedOption: a.selected_option as QuizOption,
+      isCorrect: a.is_correct,
+    })),
+    completedAt: timeAgo(row.completed_at),
+  }));
+};
+
+/** Öğrenci: bir quiz ödevi için kendi çözümünü kontrol et */
+export const fetchMyQuizSubmission = async (
+  quizAssignmentId: string,
+  userId: string
+): Promise<{ score: number; total: number } | null> => {
+  const { data } = await supabase
+    .from('quiz_submissions')
+    .select('score, total')
+    .eq('quiz_assignment_id', quizAssignmentId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (!data) return null;
+  return { score: data.score, total: data.total };
 };

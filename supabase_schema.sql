@@ -16,6 +16,13 @@ drop table if exists public.books cascade;
 drop table if exists public.profiles cascade;
 drop table if exists public.question_answers cascade;
 drop table if exists public.book_questions cascade;
+drop table if exists public.quiz_answers cascade;
+drop table if exists public.quiz_submissions cascade;
+drop table if exists public.quiz_assignments cascade;
+drop table if exists public.quiz_questions cascade;
+drop table if exists public.quiz_sets cascade;
+drop table if exists public.book_transfer_requests cascade;
+drop table if exists public.book_reviews cascade;
 
 -- Eski trigger ve fonksiyonu temizle (auth.users üzerinde kalıcıdır)
 drop trigger if exists on_auth_user_created on auth.users;
@@ -307,4 +314,135 @@ create policy "transfer_insert_student" on public.book_transfer_requests for ins
 );
 create policy "transfer_update_teacher" on public.book_transfer_requests for update to authenticated using (
   exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'teacher')
+);
+
+-- ============================================================
+-- 10. QUIZ SYSTEM (quiz setleri, soruları, ödevleri, çözümleri)
+-- ============================================================
+
+drop table if exists public.quiz_answers cascade;
+drop table if exists public.quiz_submissions cascade;
+drop table if exists public.quiz_assignments cascade;
+drop table if exists public.quiz_questions cascade;
+drop table if exists public.quiz_sets cascade;
+
+-- Quiz seti (geliştirici veya öğretmen oluşturur)
+create table public.quiz_sets (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text default '',
+  created_by uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+alter table public.quiz_sets enable row level security;
+
+create policy "quiz_sets_select" on public.quiz_sets for select to authenticated using (true);
+create policy "quiz_sets_insert" on public.quiz_sets for insert to authenticated with check (
+  exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('teacher', 'developer'))
+);
+create policy "quiz_sets_delete" on public.quiz_sets for delete to authenticated using (
+  exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('teacher', 'developer'))
+);
+
+-- Quiz soruları
+create table public.quiz_questions (
+  id uuid primary key default gen_random_uuid(),
+  quiz_set_id uuid not null references public.quiz_sets(id) on delete cascade,
+  question text not null,
+  option_a text not null,
+  option_b text not null,
+  option_c text not null,
+  option_d text not null,
+  correct_option char(1) not null check (correct_option in ('A', 'B', 'C', 'D')),
+  created_at timestamptz not null default now()
+);
+
+create index quiz_questions_set_idx on public.quiz_questions(quiz_set_id);
+
+alter table public.quiz_questions enable row level security;
+
+create policy "quiz_questions_select" on public.quiz_questions for select to authenticated using (true);
+create policy "quiz_questions_insert" on public.quiz_questions for insert to authenticated with check (
+  exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('teacher', 'developer'))
+);
+create policy "quiz_questions_delete" on public.quiz_questions for delete to authenticated using (
+  exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('teacher', 'developer'))
+);
+
+-- Quiz ödevi (öğretmen bir quiz setini sınıfa atar)
+create table public.quiz_assignments (
+  id uuid primary key default gen_random_uuid(),
+  quiz_set_id uuid not null references public.quiz_sets(id) on delete cascade,
+  target_class text not null,
+  due_date date not null,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index quiz_assignments_class_idx on public.quiz_assignments(target_class);
+
+alter table public.quiz_assignments enable row level security;
+
+create policy "quiz_assignments_select" on public.quiz_assignments for select to authenticated using (
+  exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'student' and p.class_grade = target_class)
+  or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('teacher', 'developer'))
+);
+create policy "quiz_assignments_insert" on public.quiz_assignments for insert to authenticated with check (
+  exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'teacher')
+);
+create policy "quiz_assignments_delete" on public.quiz_assignments for delete to authenticated using (
+  exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'teacher')
+);
+
+-- Quiz çözümü (öğrenci quizi çözünce)
+create table public.quiz_submissions (
+  id uuid primary key default gen_random_uuid(),
+  quiz_assignment_id uuid not null references public.quiz_assignments(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  score integer not null default 0,
+  total integer not null default 0,
+  completed_at timestamptz not null default now(),
+  unique(quiz_assignment_id, user_id)
+);
+
+create index quiz_submissions_assignment_idx on public.quiz_submissions(quiz_assignment_id);
+create index quiz_submissions_user_idx on public.quiz_submissions(user_id);
+
+alter table public.quiz_submissions enable row level security;
+
+create policy "quiz_submissions_select" on public.quiz_submissions for select to authenticated using (
+  auth.uid() = user_id
+  or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('teacher', 'developer'))
+);
+create policy "quiz_submissions_insert" on public.quiz_submissions for insert to authenticated with check (auth.uid() = user_id);
+
+-- Quiz cevap detayları
+create table public.quiz_answers (
+  id uuid primary key default gen_random_uuid(),
+  submission_id uuid not null references public.quiz_submissions(id) on delete cascade,
+  question_id uuid not null references public.quiz_questions(id) on delete cascade,
+  selected_option char(1) not null,
+  is_correct boolean not null,
+  answered_at timestamptz not null default now()
+);
+
+create index quiz_answers_submission_idx on public.quiz_answers(submission_id);
+
+alter table public.quiz_answers enable row level security;
+
+create policy "quiz_answers_select" on public.quiz_answers for select to authenticated using (
+  exists (
+    select 1 from public.quiz_submissions qs
+    where qs.id = submission_id and (
+      qs.user_id = auth.uid()
+      or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('teacher', 'developer'))
+    )
+  )
+);
+create policy "quiz_answers_insert" on public.quiz_answers for insert to authenticated with check (
+  exists (
+    select 1 from public.quiz_submissions qs
+    where qs.id = submission_id and qs.user_id = auth.uid()
+  )
 );
